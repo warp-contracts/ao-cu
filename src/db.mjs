@@ -4,6 +4,7 @@ import pkg from 'pg';
 const { Pool } = pkg;
 
 import {readFileSync} from "fs";
+import {getLogger} from "./logger.mjs";
 
 const dbConfig = {
   max: 20,
@@ -25,6 +26,7 @@ const dbConfig = {
 }
 
 const aoPool = new Pool(dbConfig);
+const logger = getLogger("db", "trace");
 
 export async function createTables() {
   await aoPool.query(
@@ -35,62 +37,62 @@ export async function createTables() {
                 message_id text,
                 result jsonb,
                 nonce bigint,
+                message_timestamp bigint,
                 timestamp timestamp with time zone default now(),
                 UNIQUE (process_id, message_id)
             );
             CREATE INDEX IF NOT EXISTS idx_results_process_id ON results(process_id);
+            CREATE INDEX IF NOT EXISTS idx_results_message_timestamp ON results(message_timestamp);
             CREATE INDEX IF NOT EXISTS idx_results_process_id_nonce ON results(process_id, nonce DESC);
+            CREATE INDEX IF NOT EXISTS idx_results_process_id_message_timestamp ON results(process_id, message_timestamp);
     `
   );
 }
 
-export async function insertResult({ processId, messageId, result, nonce }) {
+export async function insertResult({ processId, messageId, result, nonce, timestamp }) {
+  delete result.Memory;
   await aoPool.query(
-      `INSERT INTO results (process_id, message_id, result, nonce) VALUES ($1, $2, $3, $4) 
+      `INSERT INTO results (process_id, message_id, result, nonce, message_timestamp) VALUES ($1, $2, $3, $4, $5) 
        ON CONFLICT(process_id, message_id) DO NOTHING`,
-      [processId, messageId, result, nonce],
+      [processId, messageId, result, nonce, timestamp],
   )
-}
-
-export async function getLatestResult({ processId }) {
-  const result = await aoPool.query(
-      `SELECT message_id, nonce, result
-       FROM results
-       WHERE process_id = $1 ORDER BY nonce DESC LIMIT 1;`,
-      [processId],
-  )
-  return result && result.rows && result.rows.length > 0 ? {
-    messageId: result.rows[0].message_id,
-    nonce: result.rows[0].nonce,
-    result: result.rows[0].result
-  } : null;
 }
 
 export async function getForMsgId({ processId, messageId }) {
   const result = await aoPool.query(
-      `SELECT message_id, nonce, result
+      `SELECT message_id, nonce, message_timestamp, result
        FROM results
        WHERE process_id = $1 AND message_id = $2`,
       [processId, messageId],
   )
   return result && result.rows && result.rows.length > 0 ? {
     messageId: result.rows[0].message_id,
-    nonce: result.rows[0].nonce,
+    nonce: parsetInt(result.rows[0].nonce),
+    timestamp: parsetInt(result.rows[0].message_timestamp),
     result: result.rows[0].result
   } : null;
 }
 
-export async function getLessOrEq({ processId, messageId, nonce }) {
-  const result = await aoPool.query(
-      `SELECT message_id, nonce, result
+export async function getLessOrEq({ processId, nonce }) {
+  logger.trace({ processId, nonce });
+  const queryResult = await aoPool.query(
+      `SELECT message_id, nonce, message_timestamp as "mTimestamp", result
        FROM results
-       WHERE process_id = $1 AND message_id = $2 AND nonce <= $3`,
-      [processId, messageId, nonce],
+       WHERE process_id = $1 AND nonce <= $2
+       ORDER BY nonce DESC LIMIT 1`,
+      [processId, nonce],
   )
-  return result && result.rows && result.rows.length > 0 ? {
-    messageId: result.rows[0].message_id,
-    nonce: result.rows[0].nonce,
-    result: result.rows[0].result
+  //logger.trace(queryResult.rows[0]);
+  //logger.trace(queryResult.rows[0].mTimestamp);
+  const result = queryResult && queryResult.rows && queryResult.rows.length > 0 ? {
+    timestamp: parseInt(queryResult.rows[0].mTimestamp),
+    messageId: queryResult.rows[0].message_id,
+    nonce: parseInt(queryResult.rows[0].nonce),
+    result: queryResult.rows[0].result
   } : null;
+
+  // logger.trace(result);
+
+  return result;
 }
 

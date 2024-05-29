@@ -8,7 +8,7 @@
   },
   "license": "MIT",
   "scripts": {
-    "dev": "",
+    "start": "node src/app.mjs",
     "db": "docker compose -f docker-compose-local.yml up --force-recreate --build -d"
   },
   "dependencies": {

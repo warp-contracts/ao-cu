@@ -28,13 +28,14 @@ export async function resultRoute(request, response) {
     logger.debug(`Mutex for ${processId} locked`);
     await mutex.waitForUnlock();
   }
-  logger.debug('Mutex for ${processId} unlocked, acquiring');
+  logger.debug(`Mutex for ${processId} unlocked, acquiring`);
   const releaseMutex = await mutex.acquire();
   try {
     const result = await doReadResult(processId, messageId);
     logger.info(`Result for ${processId}::${messageId} calculated in ${benchmark.elapsed()}`);
     return response.json(result);
   } finally {
+    logger.debug(`Releasing mutex for ${processId}`);
     releaseMutex();
   }
 }
@@ -44,29 +45,49 @@ async function doReadResult(processId, messageId) {
   const message = await fetchMessageData(messageId, processId);
   logger.info(`Fetching message info ${messageBenchmark.elapsed()}`);
   // note: this effectively skips the initial process message -
-  // which in AO is considered as 'constructor' - we do not need it now
+  // which in AO is considered as a 'constructor' - we do not need it now
   if (message === null) {
     logger.info('Initial process message - skipping');
     return {
       Error: 'Skipping initial process message',
       Messages: [],
       Spawns: [],
-      Output: null
+      Output: null,
+      State: {}
     };
   }
   const nonce = message.Nonce;
   logger.info({messageId, processId, nonce});
-
-  // first try to load from the in-memory cache
-  let cachedResult = await prevResultCache.get(processId);
-  // and fallback to L2 if not found...
-  if (!cachedResult) {
-    cachedResult = await getLessOrEq({processId, messageId, nonce});
+  if (!handlersCache.has(processId)) {
+    await cacheProcessHandler(processId);
   }
 
+  if (message.Nonce === 0) {
+    logger.debug('First message for the process');
+    const initialState = handlersCache.get(processId).def.initialState;
+    const result = await doEvalState(messageId, processId, message, initialState, true);
+    prevResultCache.set(processId, {
+      messageId,
+      nonce,
+      timestamp: message.Timestamp,
+      result
+    });
+    return result;
+  }
+
+  // first try to load from the in-memory cache
+  // and fallback to L2 (DB) cache
+  let cachedResult = prevResultCache.get(processId);
+  if (!cachedResult) {
+    cachedResult = await getLessOrEq({processId, nonce});
+  }
+
+  logger.trace(`cachedResult timestamp: ${cachedResult.timestamp}`);
+
   if (cachedResult) {
-    // (1) exact match = someone requested for the same state twice?
+    // (1) exact match = someone requested the same state twice?
     if (cachedResult.nonce === message.Nonce) {
+      logger.trace(`cachedResult.nonce === message.Nonce`);
       logger.debug(`Exact match for nonce ${message.Nonce}`);
       return cachedResult.result
     }
@@ -74,22 +95,34 @@ async function doReadResult(processId, messageId) {
     // (2) most probable case - we need to evaluate the result for the new message,
     // and we have a result cached for the exact previous message
     if (cachedResult.nonce === message.Nonce - 1) {
-      const result = await doEvalState(messageId, processId, message, cachedResult.result);
+      logger.trace(`cachedResult.nonce === message.Nonce - 1`);
+      const result = await doEvalState(messageId, processId, message, cachedResult.result.State, true);
       prevResultCache.set(processId, {
         messageId,
         nonce,
+        timestamp: message.Timestamp,
         result
       });
+      return result;
     }
 
     // (3) for some reason evaluation for some messages was skipped, and
-    // we need to first load all the missing messages (cachedResult.nonce, message.Nonce> from the SU.
+    // we need to first load all the missing messages(cachedResult.nonce, message.Nonce> from the SU.
     if (cachedResult.nonce < message.Nonce - 1) {
-      // TODO: load missing messages from SU and eval shit
-      throw new Error('Loading missing messages from SU not yet implemented');
+      logger.trace(`cachedResult.nonce < message.Nonce - 1`);
+      const messages = await loadMessages(processId, cachedResult.timestamp, message.Timestamp);
+      const {result, lastMessage} = await evalMessages(processId, messages, cachedResult.result.State);
+      prevResultCache.set(processId, {
+        messageId: lastMessage.Id,
+        nonce: lastMessage.Nonce,
+        timestamp: lastMessage.Timestamp,
+        result
+      });
+      return result;
     }
 
     if (cachedResult.nonce > message.Nonce) {
+      logger.trace(`cachedResult.nonce > message.Nonce`);
       logger.warn(`${messageId} for ${processId} already evaluated, returning from L2 cache`);
       const result = await getForMsgId({processId, messageId});
       if (!result) {
@@ -98,26 +131,63 @@ async function doReadResult(processId, messageId) {
       return result;
     }
   } else {
-    // TODO: eval shit from scratch
-    throw new Error('Evaluation from scratch not yet implemented');
+    logger.debug('ChachedResult null');
+    const messages = await loadMessages(processId, 0, message.Timestamp);
+    const initialState = handlersCache.get(processId).def.initialState;
+    const {result, lastMessage} = await evalMessages(processId, messages, initialState);
+    prevResultCache.set(processId, {
+      messageId: lastMessage.Id,
+      nonce: lastMessage.Nonce,
+      timestamp: lastMessage.Timestamp,
+      result
+    });
+    return result;
   }
 }
 
-async function doEvalState(messageId, processId, message, prevState) {
-  if (!handlersCache.has(processId)) {
-    await cacheProcessHandler(processId);
+async function evalMessages(processId, messages, prevState) {
+  const messagesLength = messages.length;
+  if (messagesLength === 0) {
+    return {
+      Error: '',
+      Messages: [],
+      Spawns: [],
+      Output: null,
+      State: prevState
+    };
+  }
+  let result;
+  let lastMessage;
+  for (let i = 0; i < messagesLength; i++) {
+    lastMessage = parseMessagesData(messages[i].node, processId);
+    result = await doEvalState(lastMessage.Id, processId, lastMessage, prevState, false);
+    prevState = result.State;
   }
 
+  await publishToAppSync(lastMessage, result, processId, lastMessage.Id);
+  // do not await in order not to slow down the processing
+  storeResultInDb(processId, lastMessage.Id, lastMessage, result);
+
+  return {
+    lastMessage,
+    result
+  };
+}
+
+async function doEvalState(messageId, processId, message, prevState, store) {
+  logger.debug(`Eval for ${processId}:${messageId}:${message.Nonce}`);
   const calculationBenchmark = Benchmark.measure();
-  const result = await handlersCache.get(message.Target).handle(message, prevState);
+  const result = await handlersCache.get(processId).api.handle(message, prevState);
   logger.info(`Calculating ${calculationBenchmark.elapsed()}`);
   logger.debug(result.Output);
 
-  // this one needs to by synced, in order to retain order from the clients' perspective
-  await publishToAppSync(message, result, processId, messageId);
+  if (store) {
+    // this one needs to by synced, in order to retain order from the clients' perspective
+    await publishToAppSync(message, result, processId, messageId);
 
-  // do not await in order not to slow down the processing
-  storeResultInDb(processId, messageId, message, result);
+    // do not await in order not to slow down the processing
+    storeResultInDb(processId, messageId, message, result);
+  }
 
   return {
     Error: result.Error,
@@ -136,8 +206,10 @@ async function cacheProcessHandler(processId) {
     contractSource: processDefinition.moduleSource,
     binaryType: 'release_sync'
   })
-  handlersCache.set(processId, quickJsHandlerApi);
-  stateCache.set(processId, processDefinition.initialState);
+  handlersCache.set(processId, {
+    api: quickJsHandlerApi,
+    def: processDefinition
+  });
 }
 
 function publishToAppSync(message, result, processId, messageId) {
@@ -157,7 +229,10 @@ function publishToAppSync(message, result, processId, messageId) {
 }
 
 function storeResultInDb(processId, messageId, message, result) {
-  insertResult({processId, messageId, nonce: message.Nonce, result})
+  insertResult({processId, messageId, result, nonce: message.Nonce, timestamp: message.Timestamp})
+      .catch((e) => {
+        logger.error(e);
+      })
       .then(() => {
         logger.debug(`Result for ${processId}:${messageId}:${message.Nonce} stored in db`);
       });
@@ -203,10 +278,12 @@ async function fetchMessageData(messageId, processId) {
   }
 }
 
-async function parseMessagesData(input, processId) {
+function parseMessagesData(input, processId) {
   const {message, assignment} = input;
+
   const type = tagValue(message.tags, 'Type');
   if (type === 'Process') {
+    logger.debug("RETURNING NULL");
     return null;
   }
   return {
@@ -229,6 +306,30 @@ async function parseMessagesData(input, processId) {
   }
 }
 
-function getPrevKeyForNonce(processId, nonce) {
-  return `${processId}_${("" + nonce).padStart(16, '0')}`;
+// TODO: lame implementation "for now", stream messages, or at least whole pages.
+async function loadMessages(processId, fromExclusive, toInclusive) {
+  const benchmark = Benchmark.measure();
+  const result = [];
+  logger.info(`Loading messages from su ${processId}:${fromExclusive}:${toInclusive}`);
+  let hasNextPage = true;
+  while (hasNextPage) {
+    const url = `${suUrl}/${processId}?from=${fromExclusive}&to=${toInclusive}`;
+    logger.trace(url);
+    const response = await fetch(url);
+    if (response.ok) {
+      const pageResult = await response.json();
+      result.push(...pageResult.edges);
+      hasNextPage = pageResult.page_info.has_next_page;
+      if (hasNextPage) {
+        fromExclusive = result[result.length - 1].cursor;
+        logger.debug(`New from ${fromExclusive}`);
+      }
+    } else {
+      throw new Error(`${response.statusCode}: ${response.statusMessage}`);
+    }
+  }
+  logger.debug(`Messages loaded in: ${benchmark.elapsed()}`);
+  logger.info(`Found ${result.length} messages for ${processId}`);
+
+  return result;
 }
