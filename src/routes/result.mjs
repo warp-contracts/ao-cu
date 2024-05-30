@@ -62,7 +62,7 @@ async function doReadResult(processId, messageId) {
     await cacheProcessHandler(processId);
   }
 
-  if (message.Nonce === 0) {
+  if (nonce === 0) {
     logger.debug('First message for the process');
     const initialState = handlersCache.get(processId).def.initialState;
     const result = await doEvalState(messageId, processId, message, initialState, true);
@@ -75,18 +75,16 @@ async function doReadResult(processId, messageId) {
     return result;
   }
 
-  // first try to load from the in-memory cache
-  // and fallback to L2 (DB) cache
+  // first try to load from the in-memory cache...
   let cachedResult = prevResultCache.get(processId);
+  // ...fallback to L2 (DB) cache
   if (!cachedResult) {
     cachedResult = await getLessOrEq({processId, nonce});
   }
 
-  logger.trace(`cachedResult timestamp: ${cachedResult.timestamp}`);
-
   if (cachedResult) {
     // (1) exact match = someone requested the same state twice?
-    if (cachedResult.nonce === message.Nonce) {
+    if (cachedResult.nonce === nonce) {
       logger.trace(`cachedResult.nonce === message.Nonce`);
       logger.debug(`Exact match for nonce ${message.Nonce}`);
       return cachedResult.result
@@ -94,7 +92,7 @@ async function doReadResult(processId, messageId) {
 
     // (2) most probable case - we need to evaluate the result for the new message,
     // and we have a result cached for the exact previous message
-    if (cachedResult.nonce === message.Nonce - 1) {
+    if (cachedResult.nonce === nonce - 1) {
       logger.trace(`cachedResult.nonce === message.Nonce - 1`);
       const result = await doEvalState(messageId, processId, message, cachedResult.result.State, true);
       prevResultCache.set(processId, {
@@ -108,7 +106,7 @@ async function doReadResult(processId, messageId) {
 
     // (3) for some reason evaluation for some messages was skipped, and
     // we need to first load all the missing messages(cachedResult.nonce, message.Nonce> from the SU.
-    if (cachedResult.nonce < message.Nonce - 1) {
+    if (cachedResult.nonce < nonce - 1) {
       logger.trace(`cachedResult.nonce < message.Nonce - 1`);
       const messages = await loadMessages(processId, cachedResult.timestamp, message.Timestamp);
       const {result, lastMessage} = await evalMessages(processId, messages, cachedResult.result.State);
@@ -121,7 +119,7 @@ async function doReadResult(processId, messageId) {
       return result;
     }
 
-    if (cachedResult.nonce > message.Nonce) {
+    if (cachedResult.nonce > nonce) {
       logger.trace(`cachedResult.nonce > message.Nonce`);
       logger.warn(`${messageId} for ${processId} already evaluated, returning from L2 cache`);
       const result = await getForMsgId({processId, messageId});
@@ -249,6 +247,9 @@ async function fetchProcessDef(processId) {
 
 async function parseProcessData(message) {
   // TODO: check whether module and process were deployed from our "jnio" wallet
+  if (message.owner.address !== "jnioZFibZSCcV8o-HkBXYPYEYNib4tqfexP0kCBXX_M") {
+    throw new Error(`Only processes from "jnioZFibZSCcV8o-HkBXYPYEYNib4tqfexP0kCBXX_M" address are allowed`);
+  }
   const moduleTxId = tagValue(message.tags, 'Module');
   return {
     block: message.block,
@@ -270,6 +271,26 @@ async function fetchModuleSource(moduleTxId) {
 }
 
 async function fetchMessageData(messageId, processId) {
+  /*
+  // turns out it also slow AF....
+  if (timestamp) {
+    // some low-level optimization to use the messages endpoint (which currently responds
+    // faster than the single message endpoint)
+    logger.debug(`Trying to fetch from 'messages' endpoint.`);
+    const url = `${suUrl}/${processId}?from=${timestamp}&to=${timestamp + 60000}`;
+    logger.trace(url);
+    const response = await fetch(url);
+    if (response.ok) {
+      const result = await response.json();
+      if (result.edges?.length && result.edges[0].node.message.id === messageId) {
+        logger.debug("Returning message data from the 'messages' endpoint");
+        return parseMessagesData(result.edges[0].node, processId);
+      }
+    } else {
+      throw new Error(`${response.statusCode}: ${response.statusMessage}`);
+    }
+  }*/
+  logger.debug("Loading message data from the 'single message' endpoint");
   const response = await fetch(`${suUrl}/${messageId}?process-id=${processId}`);
   if (response.ok) {
     return parseMessagesData(await response.json(), processId);
@@ -283,7 +304,6 @@ function parseMessagesData(input, processId) {
 
   const type = tagValue(message.tags, 'Type');
   if (type === 'Process') {
-    logger.debug("RETURNING NULL");
     return null;
   }
   return {
