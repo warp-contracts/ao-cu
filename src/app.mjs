@@ -17,7 +17,7 @@ async function runServer() {
   logger.debug("Tables created");
   const webserver = new HyperExpress.Server();
   webserver.use('/', api_v1_router);
-  const port = process.env.PORT || 6667;
+  const port = parseInt(process.env.PORT) || 8090;
   await webserver.listen(port);
   logger.info(THE_BEAVER);
   logger.info(`Listening on ${port} port`);
