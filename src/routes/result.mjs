@@ -52,6 +52,7 @@ async function doReadResult(processId, messageId) {
       Error: 'Skipping initial process message',
       Messages: [],
       Spawns: [],
+      Assignments: [],
       Output: null,
       State: {}
     };
@@ -150,6 +151,7 @@ async function evalMessages(processId, messages, prevState) {
       Error: '',
       Messages: [],
       Spawns: [],
+      Assignments: [],
       Output: null,
       State: prevState
     };
@@ -192,7 +194,8 @@ async function doEvalState(messageId, processId, message, prevState, store) {
     Messages: result.Messages,
     Spawns: result.Spawns,
     Output: result.Output,
-    State: result.State
+    State: result.State,
+    Assignments: []
   };
 }
 
