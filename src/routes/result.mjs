@@ -1,18 +1,19 @@
 import {getLogger} from "../logger.mjs";
 import {QuickJsPlugin} from 'warp-contracts-plugin-quickjs';
 import {tagValue} from "../tools.mjs";
-import {publish as appSyncPublish, initPubSub as initAppSyncPublish} from 'warp-contracts-pubsub'
+import {initPubSub as initAppSyncPublish, publish as appSyncPublish} from 'warp-contracts-pubsub'
 import {getForMsgId, getLessOrEq, insertResult} from "../db.mjs";
 import {Benchmark} from "warp-contracts";
 import {Mutex} from "async-mutex";
+import {broadcast_message} from "./sse.mjs";
 
 initAppSyncPublish()
 
+const logger = getLogger("resultRoute", "trace");
 const suUrl = "http://127.0.0.1:9000";
 
 const handlersCache = new Map();
 const prevResultCache = new Map();
-const logger = getLogger("resultRoute", "trace");
 const mutexes = new Map();
 
 export async function resultRoute(request, response) {
@@ -164,7 +165,7 @@ async function evalMessages(processId, messages, prevState) {
     prevState = result.State;
   }
 
-  await publishToAppSync(lastMessage, result, processId, lastMessage.Id);
+  await publish(lastMessage, result, processId, lastMessage.Id);
   // do not await in order not to slow down the processing
   storeResultInDb(processId, lastMessage.Id, lastMessage, result);
 
@@ -183,7 +184,7 @@ async function doEvalState(messageId, processId, message, prevState, store) {
 
   if (store) {
     // this one needs to by synced, in order to retain order from the clients' perspective
-    await publishToAppSync(message, result, processId, messageId);
+    publish(message, result, processId, messageId);
 
     // do not await in order not to slow down the processing
     storeResultInDb(processId, messageId, message, result);
@@ -213,31 +214,36 @@ async function cacheProcessHandler(processId) {
   });
 }
 
-function publishToAppSync(message, result, processId, messageId) {
+function publish(message, result, processId, messageId) {
+
+  const messageToPublish = JSON.stringify({
+    txId: messageId,
+    nonce: message.Nonce,
+    output: result.Output,
+    state: result.State,
+    tags: message.Tags,
+    sent: new Date()
+  });
+
+  broadcast_message(processId, messageToPublish);
+/*
   return appSyncPublish(
-      `results/ao/${message.Target}`,
-      JSON.stringify({
-        txId: messageId,
-        nonce: message.Nonce,
-        output: result.Output,
-        state: result.State,
-        tags: message.Tags,
-        sent: new Date()
-      }),
-      process.env.APPSYNC_KEY
+    `results/ao/${message.Target}`,
+    messageToPublish,
+    process.env.APPSYNC_KEY
   ).then(() => {
     logger.debug(`Result for ${processId}:${messageId}:${message.Nonce} published`);
-  });
+  });*/
 }
 
 function storeResultInDb(processId, messageId, message, result) {
   insertResult({processId, messageId, result, nonce: message.Nonce, timestamp: message.Timestamp})
-      .catch((e) => {
-        logger.error(e);
-      })
-      .then(() => {
-        logger.debug(`Result for ${processId}:${messageId}:${message.Nonce} stored in db`);
-      });
+    .catch((e) => {
+      logger.error(e);
+    })
+    .then(() => {
+      logger.debug(`Result for ${processId}:${messageId}:${message.Nonce} stored in db`);
+    });
 }
 
 async function fetchProcessDef(processId) {
@@ -276,7 +282,7 @@ async function fetchModuleSource(moduleTxId) {
 
 async function fetchMessageData(messageId, processId) {
   /*
-  // turns out it also slow AF....
+  // turns out it is also slow AF....
   if (timestamp) {
     // some low-level optimization to use the messages endpoint (which currently responds
     // faster than the single message endpoint)

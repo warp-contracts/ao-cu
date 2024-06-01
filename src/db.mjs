@@ -28,6 +28,10 @@ const dbConfig = {
 const aoPool = new Pool(dbConfig);
 const logger = getLogger("db", "trace");
 
+export async function closePool() {
+  await aoPool.end();
+}
+
 export async function createTables() {
   await aoPool.query(
       `

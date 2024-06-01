@@ -19,11 +19,13 @@
     "pino": "^9.1.0",
     "pg": "^8.11.5",
     "dotenv": "^16.4.5",
-    "warp-contracts-pubsub": "^1.0.8"
+    "warp-contracts-pubsub": "^1.0.8",
+    "async-exit-hook": "^2.0.1"
   },
   "devDependencies": {
     "pino-pretty": "^11.0.0",
     "@ardrive/turbo-sdk": "latest",
+    "eventsource": "^2.0.2",
     "arweave": "^1.14.4"
   }
 }

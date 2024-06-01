@@ -1,10 +1,13 @@
 import dotenv from "dotenv";
+
 dotenv.config();
 import * as HyperExpress from "hyper-express";
 import {api_v1_router} from "./router.mjs";
-import {createTables} from "./db.mjs";
+import {closePool, createTables} from "./db.mjs";
 import {getLogger} from "./logger.mjs";
 import {THE_BEAVER} from "./beaver.mjs";
+import exitHook from 'async-exit-hook';
+// const exitHook = pkg;
 
 const logger = getLogger("server", "trace");
 
@@ -23,4 +26,11 @@ async function runServer() {
   logger.info(`Listening on ${port} port`);
 }
 
+async function cleanup(callback) {
+  logger.warn('Interrupted');
+  await closePool();
+  logger.info('Clean up finished');
+  callback();
+}
 
+exitHook(cleanup);
