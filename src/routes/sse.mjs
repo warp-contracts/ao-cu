@@ -34,6 +34,7 @@ export function subscribeRoute(request, response) {
   response.setHeader('Cache-Control', 'no-cache');
   response.setHeader('Content-Type', 'text/event-stream');
   response.setHeader('Connection', 'keep-alive');
+  response.setHeader('Transfer-Encoding', 'chunked');
 
   // Check to ensure that SSE if available for this request
   if (response.sse) {
