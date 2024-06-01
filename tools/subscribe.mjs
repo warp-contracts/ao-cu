@@ -16,7 +16,8 @@ const record_event = (event) => {
 
 };
 
-const sse = new EventSource("http://localhost:8090/subscribe/Cp_c6eha1-1ZTA4EC0jOKOSg_NYJqbQIqUkBDy5rNag");
+// const sse = new EventSource("http://localhost:8090/subscribe/Cp_c6eha1-1ZTA4EC0jOKOSg_NYJqbQIqUkBDy5rNag");
+const sse = new EventSource("https://cu.warp.cc/subscribe/9TfmQmj4QA9ut7FGcsHC6HEYF8EN173sZql9oJzQorY");
 sse.onmessage = record_event;
 
 process.on('SIGINT', () => {
