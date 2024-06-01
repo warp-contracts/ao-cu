@@ -3042,10 +3042,10 @@ warp-arbundles@^1.0.4:
     buffer "^6.0.3"
     warp-isomorphic "^1.0.7"
 
-warp-contracts-plugin-quickjs@^1.1.5:
-  version "1.1.5"
-  resolved "https://registry.yarnpkg.com/warp-contracts-plugin-quickjs/-/warp-contracts-plugin-quickjs-1.1.5.tgz#ca3f10621868f5ea136f5373d749bb3a05d67abc"
-  integrity sha512-aB/kRea+Qp6UeHbL1gawt8dHnFhYgk2Con1sOXL4DAC8UHgCkfc+u2oIYBZ4aAFPXf7/sU6RmuLbSUcVwxxtQg==
+warp-contracts-plugin-quickjs@^1.1.6:
+  version "1.1.6"
+  resolved "https://registry.yarnpkg.com/warp-contracts-plugin-quickjs/-/warp-contracts-plugin-quickjs-1.1.6.tgz#4ed695f38cd3f2bb1abcfe3ed1e77726de1d4ac2"
+  integrity sha512-1A3rTDbwlw+7VvHvgf2oKng2D3Y49LIYOlYhfhokBoycQRwjjoYwm0zrE4/MH+kDSLP/DVDPCbuqMNejphDbFA==
   dependencies:
     pngjs "7.0.0"
     quickjs-emscripten "^0.29.1"
