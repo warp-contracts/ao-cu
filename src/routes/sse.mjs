@@ -33,11 +33,6 @@ export function subscribeRoute(request, response) {
 
   // Check to ensure that SSE if available for this request
   if (response.sse) {
-    response.setHeader('Access-Control-Allow-Origin', "*");
-    response.setHeader('Cache-Control', 'no-cache');
-    response.setHeader('Content-Type', 'text/event-stream');
-    response.setHeader('Connection', 'keep-alive');
-    response.setHeader('Transfer-Encoding', 'chunked');
     // Looks like we're all good, let's open the stream
     response.sse.open();
     // OR you may also send a message which will open the stream automatically
