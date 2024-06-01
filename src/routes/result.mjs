@@ -183,7 +183,7 @@ async function doEvalState(messageId, processId, message, prevState, store) {
 
   if (store) {
     // this one needs to by synced, in order to retain order from the clients' perspective
-    publish(message, result, processId, messageId);
+    await publish(message, result, processId, messageId);
 
     // do not await in order not to slow down the processing
     storeResultInDb(processId, messageId, message, result);
@@ -213,7 +213,7 @@ async function cacheProcessHandler(processId) {
   });
 }
 
-function publish(message, result, processId, messageId) {
+async function publish(message, result, processId, messageId) {
 
   const messageToPublish = JSON.stringify({
     txId: messageId,
@@ -224,15 +224,14 @@ function publish(message, result, processId, messageId) {
     sent: new Date()
   });
 
-  broadcast_message(processId, messageToPublish);
-/*
+  //broadcast_message(processId, messageToPublish);
   return appSyncPublish(
     `results/ao/${message.Target}`,
     messageToPublish,
     process.env.APPSYNC_KEY
   ).then(() => {
     logger.debug(`Result for ${processId}:${messageId}:${message.Nonce} published`);
-  });*/
+  });
 }
 
 function storeResultInDb(processId, messageId, message, result) {
