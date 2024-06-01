@@ -7,9 +7,6 @@ export const corsMiddleware = async(request, response, next) => {
   response.setHeader('Access-Control-Allow-Methods', 'OPTIONS, POST, GET, PUT, DELETE')
   response.setHeader('Access-Control-Allow-Origin', '*');
   response.setHeader('Cache-Control', 'no-cache');
-  response.setHeader('Content-Type', 'text/event-stream');
-  response.setHeader('Connection', 'keep-alive');
-  response.setHeader('Transfer-Encoding', 'chunked');
   response.setHeader('Access-Control-Allow-Credentials', 'true');
   next();
 }
