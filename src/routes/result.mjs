@@ -8,7 +8,7 @@ import {Mutex} from "async-mutex";
 
 initAppSyncPublish()
 
-const suUrl = "https://su-router.ao-testnet.xyz";
+const suUrl = "http://127.0.0.1:9000";
 
 const handlersCache = new Map();
 const prevResultCache = new Map();
@@ -217,6 +217,7 @@ function publishToAppSync(message, result, processId, messageId) {
   return appSyncPublish(
       `results/ao/${message.Target}`,
       JSON.stringify({
+        txId: messageId,
         nonce: message.Nonce,
         output: result.Output,
         state: result.State,

@@ -22,6 +22,8 @@
     "warp-contracts-pubsub": "^1.0.8"
   },
   "devDependencies": {
-    "pino-pretty": "^11.0.0"
+    "pino-pretty": "^11.0.0",
+    "@ardrive/turbo-sdk": "latest",
+    "arweave": "^1.14.4"
   }
 }
