@@ -12,6 +12,5 @@ export const corsMiddleware = async(request, response, next) => {
 
 export const api_v1_router = new HyperExpress.Router();
 api_v1_router.get('/result/:message-identifier', resultRoute);
-api_v1_router.get('/subscribe/:process-identifier', subscribeRoute)
-  .use(corsMiddleware);
+api_v1_router.get('/subscribe/:process-identifier', subscribeRoute);
 api_v1_router.get('/', mainRoute);

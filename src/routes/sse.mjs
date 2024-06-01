@@ -30,6 +30,11 @@ export function subscribeRoute(request, response) {
     sseStreams.set(processId, new Map());
   }
   const processStreams = sseStreams.get(processId);
+  response.setHeader('Access-Control-Allow-Origin', "*");
+  response.setHeader('Cache-Control', 'no-cache');
+  response.setHeader('Content-Type', 'text/event-stream');
+  response.setHeader("Access-Control-Allow-Origin", "*");
+  response.setHeader('Connection', 'keep-alive');
 
   // Check to ensure that SSE if available for this request
   if (response.sse) {
