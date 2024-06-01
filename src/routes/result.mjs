@@ -180,7 +180,6 @@ async function doEvalState(messageId, processId, message, prevState, store) {
   const calculationBenchmark = Benchmark.measure();
   const result = await handlersCache.get(processId).api.handle(message, prevState);
   logger.info(`Calculating ${calculationBenchmark.elapsed()}`);
-  logger.debug(result.Output);
 
   if (store) {
     // this one needs to by synced, in order to retain order from the clients' perspective
