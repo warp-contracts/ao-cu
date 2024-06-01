@@ -33,7 +33,6 @@ export function subscribeRoute(request, response) {
   response.setHeader('Access-Control-Allow-Origin', "*");
   response.setHeader('Cache-Control', 'no-cache');
   response.setHeader('Content-Type', 'text/event-stream');
-  response.setHeader("Access-Control-Allow-Origin", "*");
   response.setHeader('Connection', 'keep-alive');
 
   // Check to ensure that SSE if available for this request
