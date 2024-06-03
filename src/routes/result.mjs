@@ -35,6 +35,8 @@ export async function resultRoute(request, response) {
     const result = await doReadResult(processId, messageId);
     logger.info(`Result for ${processId}::${messageId} calculated in ${benchmark.elapsed()}`);
     return response.json(result);
+  } catch (e) {
+    logger.error(e);
   } finally {
     logger.debug(`Releasing mutex for ${processId}`);
     releaseMutex();
@@ -189,7 +191,7 @@ async function doEvalState(messageId, processId, message, prevState, store) {
     await publish(message, result, processId, messageId);
 
     // do not await in order not to slow down the processing
-    storeResultInDb(processId, messageId, message, result);
+    await storeResultInDb(processId, messageId, message, result);
   }
 
   return {
@@ -238,7 +240,7 @@ async function publish(message, result, processId, messageId) {
 }
 
 function storeResultInDb(processId, messageId, message, result) {
-  insertResult({processId, messageId, result, nonce: message.Nonce, timestamp: message.Timestamp})
+  return insertResult({processId, messageId, result, nonce: message.Nonce, timestamp: message.Timestamp})
     .catch((e) => {
       logger.error(e);
     })
