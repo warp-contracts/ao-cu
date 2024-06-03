@@ -219,7 +219,7 @@ async function publish(message, result, processId, messageId) {
     txId: messageId,
     nonce: message.Nonce,
     output: result.Output,
-    //state: result.State,
+    state: result.State,
     tags: message.Tags,
     sent: new Date()
   });
