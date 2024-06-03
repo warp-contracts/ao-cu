@@ -248,8 +248,11 @@ function storeResultInDb(processId, messageId, message, result) {
 }
 
 async function fetchProcessDef(processId) {
+  logger.trace('Before process def fetch');
   const response = await fetch(`${suUrl}/processes/${processId}`);
+  logger.trace('After process def fetch');
   if (response.ok) {
+    logger.trace('Process def fetch ok');
     return parseProcessData(await response.json());
   } else {
     throw new Error(`${response.statusCode}: ${response.statusMessage}`);
