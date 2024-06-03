@@ -172,7 +172,7 @@ async function evalMessages(processId, messages, prevState) {
 
   await publish(lastMessage, result, processId, lastMessage.Id);
   // do not await in order not to slow down the processing
-  storeResultInDb(processId, lastMessage.Id, lastMessage, result);
+  await storeResultInDb(processId, lastMessage.Id, lastMessage, result);
 
   return {
     lastMessage,
@@ -239,14 +239,13 @@ async function publish(message, result, processId, messageId) {
   });
 }
 
-function storeResultInDb(processId, messageId, message, result) {
-  return insertResult({processId, messageId, result, nonce: message.Nonce, timestamp: message.Timestamp})
-    .catch((e) => {
-      logger.error(e);
-    })
-    .then(() => {
-      logger.debug(`Result for ${processId}:${messageId}:${message.Nonce} stored in db`);
-    });
+async function storeResultInDb(processId, messageId, message, result) {
+  try {
+    await insertResult({processId, messageId, result, nonce: message.Nonce, timestamp: message.Timestamp});
+    logger.debug(`Result for ${processId}:${messageId}:${message.Nonce} stored in db`);
+  } catch (e) {
+    logger.error(e);
+  }
 }
 
 async function fetchProcessDef(processId) {
