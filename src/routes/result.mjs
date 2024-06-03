@@ -63,6 +63,7 @@ async function doReadResult(processId, messageId) {
   if (!handlersCache.has(processId)) {
     await cacheProcessHandler(processId);
   }
+  logger.info('Process handler cached');
 
   if (nonce === 0) {
     logger.debug('First message for the process');
@@ -77,10 +78,12 @@ async function doReadResult(processId, messageId) {
     return result;
   }
 
+  logger.debug('Checking cached result in L1 cache');
   // first try to load from the in-memory cache...
   let cachedResult = prevResultCache.get(processId);
   // ...fallback to L2 (DB) cache
   if (!cachedResult) {
+    logger.debug('Checking cached result in L2 cache');
     cachedResult = await getLessOrEq({processId, nonce});
   }
 
