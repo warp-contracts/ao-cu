@@ -52,7 +52,7 @@ async function doReadResult(processId, messageId) {
   if (message === null) {
     logger.info('Initial process message - skipping');
     return {
-      Error: 'Skipping initial process message',
+      Error: '',
       Messages: [],
       Spawns: [],
       Assignments: [],
@@ -320,6 +320,11 @@ function parseMessagesData(input, processId) {
 
   const type = tagValue(message.tags, 'Type');
   if (type === 'Process') {
+    logger.debug("Process deploy message");
+    logger.debug("=== message ===");
+    logger.debug(message);
+    logger.debug("=== assignment ===");
+    logger.debug(assignment);
     return null;
   }
   return {
