@@ -262,6 +262,7 @@ async function fetchProcessDef(processId) {
 async function parseProcessData(message) {
   // TODO: check whether module and process were deployed from our "jnio" wallet
   if (message.owner.address !== "jnioZFibZSCcV8o-HkBXYPYEYNib4tqfexP0kCBXX_M") {
+    logger.error(`Only processes from "jnioZFibZSCcV8o-HkBXYPYEYNib4tqfexP0kCBXX_M" address are allowed, used: ${message.owner.address}`);
     throw new Error(`Only processes from "jnioZFibZSCcV8o-HkBXYPYEYNib4tqfexP0kCBXX_M" address are allowed`);
   }
   const moduleTxId = tagValue(message.tags, 'Module');
