@@ -22,6 +22,7 @@ export async function resultRoute(request, response) {
   const messageId = request.path_parameters["message-identifier"];
   const processId = request.query_parameters["process-id"];
   if (!mutexes.has(processId)) {
+    logger.debug(`Storing mutex for ${processId}`);
     mutexes.set(processId, new Mutex());
   }
   const mutex = mutexes.get(processId);
@@ -306,10 +307,11 @@ async function fetchMessageData(messageId, processId) {
       throw new Error(`${response.statusCode}: ${response.statusMessage}`);
     }
   }*/
-  logger.debug("Loading message data from the 'single message' endpoint");
+  logger.debug(`Loading message ${messageId} for process ${processId}`);
   const response = await fetch(`${suUrl}/${messageId}?process-id=${processId}`);
   if (response.ok) {
-    return parseMessagesData(await response.json(), processId);
+    const input = await response.json();
+    return parseMessagesData(input, processId);
   } else {
     throw new Error(`${response.statusCode}: ${response.statusMessage}`);
   }
@@ -319,6 +321,7 @@ function parseMessagesData(input, processId) {
   const {message, assignment} = input;
 
   const type = tagValue(message.tags, 'Type');
+  logger.debug(`Message ${message.id} type: ${type}`);
   if (type === 'Process') {
     logger.debug("Process deploy message");
     logger.debug("=== message ===");
