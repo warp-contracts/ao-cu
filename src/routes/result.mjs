@@ -95,6 +95,7 @@ async function doReadResult(processId, messageId) {
     if (cachedResult.nonce === nonce) {
       logger.trace(`cachedResult.nonce === message.Nonce`);
       logger.debug(`Exact match for nonce ${message.Nonce}`);
+      await publish(message, cachedResult.result, processId, messageId);
       return cachedResult.result
     }
 
@@ -237,6 +238,8 @@ async function publish(message, result, processId, messageId) {
     process.env.APPSYNC_KEY
   ).then(() => {
     logger.debug(`Result for ${processId}:${messageId}:${message.Nonce} published`);
+  }).catch((e) => {
+    logger.error(e);
   });
 }
 
