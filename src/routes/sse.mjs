@@ -36,7 +36,6 @@ export function subscribeRoute(request, response) {
   response.setHeader('Cache-Control', 'no-cache');
   response.setHeader('Access-Control-Allow-Credentials', 'true');
   response.setHeader('Content-Type', 'text/event-stream');
-  response.setHeader('Cache-Control', 'no-cache');
   response.setHeader('Connection',  'keep-alive');
 
   // Check to ensure that SSE if available for this request
