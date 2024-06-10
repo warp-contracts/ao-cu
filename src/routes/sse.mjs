@@ -33,10 +33,12 @@ export function subscribeRoute(request, response) {
 
   response.setHeader('Access-Control-Allow-Methods', 'OPTIONS, POST, GET, PUT, DELETE')
   response.setHeader('Access-Control-Allow-Origin', '*');
-  response.setHeader('Cache-Control', 'no-cache');
   response.setHeader('Access-Control-Allow-Credentials', 'true');
+  response.setHeader('Cache-Control', 'no-cache');
   response.setHeader('Content-Type', 'text/event-stream');
   response.setHeader('Connection',  'keep-alive');
+  response.setHeader('X-Accel-Buffering',  'no');
+
 
   // Check to ensure that SSE if available for this request
   if (response.sse) {
