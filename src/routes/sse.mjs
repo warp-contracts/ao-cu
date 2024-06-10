@@ -31,6 +31,14 @@ export function subscribeRoute(request, response) {
   }
   const processStreams = sseStreams.get(processId);
 
+  response.setHeader('Access-Control-Allow-Methods', 'OPTIONS, POST, GET, PUT, DELETE')
+  response.setHeader('Access-Control-Allow-Origin', '*');
+  response.setHeader('Cache-Control', 'no-cache');
+  response.setHeader('Access-Control-Allow-Credentials', 'true');
+  response.setHeader('Content-Type', 'text/event-stream');
+  response.setHeader('Cache-Control', 'no-cache');
+  response.setHeader('Connection',  'keep-alive');
+
   // Check to ensure that SSE if available for this request
   if (response.sse) {
     // Looks like we're all good, let's open the stream

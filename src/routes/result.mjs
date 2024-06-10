@@ -231,7 +231,7 @@ async function publish(message, result, processId, messageId) {
     sent: new Date()
   });
 
-  //broadcast_message(processId, messageToPublish);
+  broadcast_message(processId, messageToPublish);
   return appSyncPublish(
     `results/ao/${message.Target}`,
     messageToPublish,
