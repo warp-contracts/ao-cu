@@ -34,7 +34,7 @@ export async function resultRoute(request, response) {
   const releaseMutex = await mutex.acquire();
   try {
     const result = await doReadResult(processId, messageId);
-    logger.info(`Result for ${processId}::${messageId} calculated in ${benchmark.elapsed()}`);
+    logger.info(`Result for ${messageId} calculated in ${benchmark.elapsed()}`);
     return response.json(result);
   } catch (e) {
     logger.error(e);
@@ -189,11 +189,14 @@ async function doEvalState(messageId, processId, message, prevState, store) {
   logger.info(`Calculating ${calculationBenchmark.elapsed()}`);
 
   if (store) {
+    calculationBenchmark.reset();
     // this one needs to by synced, in order to retain order from the clients' perspective
     await publish(message, result, processId, messageId);
+    logger.debug(`Published in ${calculationBenchmark.elapsed()}`);
 
-    // do not await in order not to slow down the processing
+    calculationBenchmark.reset();
     await storeResultInDb(processId, messageId, message, result);
+    logger.debug(`Stored in ${calculationBenchmark.elapsed()}`);
   }
 
   return {
@@ -232,7 +235,7 @@ async function publish(message, result, processId, messageId) {
   });
 
   broadcast_message(processId, messageToPublish);
-  return appSyncPublish(
+  /*return appSyncPublish(
     `results/ao/${message.Target}`,
     messageToPublish,
     process.env.APPSYNC_KEY
@@ -240,7 +243,7 @@ async function publish(message, result, processId, messageId) {
     logger.debug(`Result for ${processId}:${messageId}:${message.Nonce} published`);
   }).catch((e) => {
     logger.error(e);
-  });
+  });*/
 }
 
 async function storeResultInDb(processId, messageId, message, result) {
@@ -253,11 +256,8 @@ async function storeResultInDb(processId, messageId, message, result) {
 }
 
 async function fetchProcessDef(processId) {
-  logger.trace('Before process def fetch');
   const response = await fetch(`${suUrl}/processes/${processId}`);
-  logger.trace('After process def fetch');
   if (response.ok) {
-    logger.trace('Process def fetch ok');
     return parseProcessData(await response.json());
   } else {
     throw new Error(`${response.statusCode}: ${response.statusMessage}`);
@@ -361,7 +361,6 @@ async function loadMessages(processId, fromExclusive, toInclusive) {
   let hasNextPage = true;
   while (hasNextPage) {
     const url = `${suUrl}/${processId}?from=${fromExclusive}&to=${toInclusive}`;
-    logger.trace(url);
     const response = await fetch(url);
     if (response.ok) {
       const pageResult = await response.json();
