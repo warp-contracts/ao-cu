@@ -10,8 +10,8 @@ const record_event = (event) => {
 
 };
 
-const sse = new EventSource("http://localhost:8090/subscribe-test/");
-// const sse = new EventSource("https://cu.warp.cc/subscribe/dP01RXeCnps1ucqu4THK5pKVCoSCKgdxQfrRbARLbrc");
+//const sse = new EventSource("http://localhost:8090/subscribe-test/");
+const sse = new EventSource("https://cu.warp.cc/subscribe-test/");
 sse.onmessage = record_event;
 
 process.on('SIGINT', () => {

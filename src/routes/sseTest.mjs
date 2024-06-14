@@ -8,7 +8,7 @@ const logger = getLogger("sseTestRoute", "trace");
 export function broadcast_message() {
   for (let stream of sseStreams.values()) {
     logger.debug(`Sending message`);
-    stream.send('x'.repeat(128000));
+    stream.send('x'.repeat(32000));
   }
 }
 
