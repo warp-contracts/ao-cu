@@ -12,6 +12,7 @@ export function broadcast_message(processId, message) {
   }
   const processStreams = sseStreams.get(processId);
   for (let stream of processStreams.values()) {
+    logger.debug(`Sending message for process ${processId}`);
     stream.send(message);
   }
 }
