@@ -16,12 +16,15 @@ const handlersCache = new Map();
 const prevResultCache = new Map();
 const mutexes = new Map();
 
+const messages = {};
+
 export async function resultRoute(request, response) {
   const benchmark = Benchmark.measure();
 
   const messageId = request.path_parameters["message-identifier"];
   const processId = request.query_parameters["process-id"];
 
+  messages[messageId] = Date.now();
 
   const mutexBenchmark = Benchmark.measure();
   if (!mutexes.has(processId)) {
@@ -45,6 +48,7 @@ export async function resultRoute(request, response) {
     logger.error(e);
   } finally {
     logger.debug(`Releasing mutex for ${processId}`);
+    delete messages[messageId];
     releaseMutex();
   }
 }
@@ -52,6 +56,7 @@ export async function resultRoute(request, response) {
 async function doReadResult(processId, messageId) {
   const messageBenchmark = Benchmark.measure();
   const message = await fetchMessageData(messageId, processId);
+  message.CuReceived = messages[messageId];
   logger.info(`Fetching message info ${messageBenchmark.elapsed()}`);
   // note: this effectively skips the initial process message -
   // which in AO is considered as a 'constructor' - we do not need it now
@@ -239,7 +244,8 @@ async function publish(message, result, processId, messageId) {
     output: result.Output,
     // state: result.State,
     tags: message.Tags,
-    sent: new Date()
+    cuReceived: messages[messageId],
+    cuSent: Date.now()
   });
 
   broadcast_message(processId, messageToPublish);
