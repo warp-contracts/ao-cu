@@ -197,6 +197,9 @@ async function doEvalState(messageId, processId, message, prevState, store) {
   const calculationBenchmark = Benchmark.measure();
   const result = await handlersCache.get(processId).api.handle(message, prevState);
   logger.info(`Calculating ${calculationBenchmark.elapsed()}`);
+  if (!message.benchmarks) {
+    message.benchmarks = {};
+  }
   message.benchmarks.calculation = calculationBenchmark.elapsed();
 
   if (store) {
