@@ -21,6 +21,9 @@ export async function resultRoute(request, response) {
 
   const messageId = request.path_parameters["message-identifier"];
   const processId = request.query_parameters["process-id"];
+
+
+  const mutexBenchmark = Benchmark.measure();
   if (!mutexes.has(processId)) {
     logger.debug(`Storing mutex for ${processId}`);
     mutexes.set(processId, new Mutex());
@@ -32,6 +35,8 @@ export async function resultRoute(request, response) {
   }
   logger.debug(`Mutex for ${processId} unlocked, acquiring`);
   const releaseMutex = await mutex.acquire();
+  logger.debug(`Acquired mutex in ${mutexBenchmark.elapsed()}`);
+
   try {
     const result = await doReadResult(processId, messageId);
     logger.info(`Result for ${messageId} calculated in ${benchmark.elapsed()}`);
