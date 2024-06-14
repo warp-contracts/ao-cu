@@ -11,7 +11,7 @@ export function broadcast_message() {
   counter++;
   for (let stream of sseStreams.values()) {
     logger.debug(`Sending message`);
-    stream.send(counter + '|' + 'x'.repeat(42000));
+    stream.send(counter + '|' + 'x'.repeat(47000));
   }
 }
 
@@ -35,7 +35,7 @@ export function subscribeTestRoute(request, response) {
     // Looks like we're all good, let's open the stream
     response.sse.open();
     // OR you may also send a message which will open the stream automatically
-    response.sse.send(`Subscribed for test`);
+    response.sse.send(`Subscribed for test ${'x'.repeat(100_000)}`);
 
     // Assign a unique identifier to this stream and store it in our broadcast pool
     response.sse.id = crypto.randomUUID();
