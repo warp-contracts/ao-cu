@@ -23,6 +23,15 @@ setInterval(() => {
   }
 }, 10000);
 
+
+export function getSubscriptions() {
+  const result = {};
+  for (const [key, value] of sseStreams) {
+    result[key] = value.size;
+  }
+  return result;
+}
+
 export function subscribeRoute(request, response) {
   const processId = request.path_parameters["process-identifier"];
   logger.info(`Subscribing for ${processId}`);

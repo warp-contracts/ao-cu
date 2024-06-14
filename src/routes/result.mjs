@@ -1,7 +1,7 @@
 import {getLogger} from "../logger.mjs";
 import {QuickJsPlugin} from 'warp-contracts-plugin-quickjs';
 import {tagValue} from "../tools.mjs";
-import {initPubSub as initAppSyncPublish, publish as appSyncPublish} from 'warp-contracts-pubsub'
+import {initPubSub as initAppSyncPublish} from 'warp-contracts-pubsub'
 import {getForMsgId, getLessOrEq, insertResult} from "../db.mjs";
 import {Benchmark} from "warp-contracts";
 import {Mutex} from "async-mutex";
@@ -195,8 +195,11 @@ async function doEvalState(messageId, processId, message, prevState, store) {
     logger.debug(`Published in ${calculationBenchmark.elapsed()}`);
 
     calculationBenchmark.reset();
-    await storeResultInDb(processId, messageId, message, result);
-    logger.debug(`Stored in ${calculationBenchmark.elapsed()}`);
+    storeResultInDb(processId, messageId, message, result)
+      .finally(() => {
+        logger.debug(`Stored in ${calculationBenchmark.elapsed()}`);
+      });
+
   }
 
   return {
@@ -229,7 +232,7 @@ async function publish(message, result, processId, messageId) {
     txId: messageId,
     nonce: message.Nonce,
     output: result.Output,
-    state: result.State,
+    // state: result.State,
     tags: message.Tags,
     sent: new Date()
   });
