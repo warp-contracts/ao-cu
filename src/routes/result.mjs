@@ -32,14 +32,8 @@ export async function resultRoute(request, response) {
     mutexes.set(processId, new Mutex());
   }
   const mutex = mutexes.get(processId);
-  if (mutex.isLocked()) {
-    logger.debug(`Mutex for ${processId} locked`);
-    await mutex.waitForUnlock();
-  }
-  logger.debug(`Mutex for ${processId} unlocked, acquiring`);
-  const releaseMutex = await mutex.acquire();
+  const release = await mutex.acquire();
   logger.debug(`Acquired mutex in ${mutexBenchmark.elapsed()}`);
-
   try {
     const result = await doReadResult(processId, messageId);
     logger.info(`Result for ${messageId} calculated in ${benchmark.elapsed()}`);
@@ -49,7 +43,7 @@ export async function resultRoute(request, response) {
   } finally {
     logger.debug(`Releasing mutex for ${processId}`);
     delete messages[messageId];
-    releaseMutex();
+    release();
   }
 }
 
@@ -58,6 +52,9 @@ async function doReadResult(processId, messageId) {
   const message = await fetchMessageData(messageId, processId);
   message.CuReceived = messages[messageId];
   logger.info(`Fetching message info ${messageBenchmark.elapsed()}`);
+  message.benchmarks = {
+    fetchMessage: messageBenchmark.elapsed()
+  }
   // note: this effectively skips the initial process message -
   // which in AO is considered as a 'constructor' - we do not need it now
   if (message === null) {
@@ -78,6 +75,7 @@ async function doReadResult(processId, messageId) {
   }
   logger.info('Process handler cached');
 
+  const cacheLookupBenchmark = Benchmark.measure();
   logger.debug('Checking cached result in L1 cache');
   // first try to load from the in-memory cache...
   let cachedResult = prevResultCache.get(processId);
@@ -86,6 +84,7 @@ async function doReadResult(processId, messageId) {
     logger.debug('Checking cached result in L2 cache');
     cachedResult = await getLessOrEq({processId, nonce});
   }
+  message.benchmarks.cacheLookup = cacheLookupBenchmark.elapsed();
 
   if (nonce === 0 && !cachedResult) {
     logger.debug('First message for the process');
@@ -184,7 +183,8 @@ async function evalMessages(processId, messages, prevState) {
 
   await publish(lastMessage, result, processId, lastMessage.Id);
   // do not await in order not to slow down the processing
-  await storeResultInDb(processId, lastMessage.Id, lastMessage, result);
+  storeResultInDb(processId, lastMessage.Id, lastMessage, result)
+    .finally();
 
   return {
     lastMessage,
@@ -197,6 +197,7 @@ async function doEvalState(messageId, processId, message, prevState, store) {
   const calculationBenchmark = Benchmark.measure();
   const result = await handlersCache.get(processId).api.handle(message, prevState);
   logger.info(`Calculating ${calculationBenchmark.elapsed()}`);
+  message.benchmarks.calculation = calculationBenchmark.elapsed();
 
   if (store) {
     calculationBenchmark.reset();
@@ -245,7 +246,8 @@ async function publish(message, result, processId, messageId) {
     // state: result.State,
     tags: message.Tags,
     cuReceived: messages[messageId],
-    cuSent: Date.now()
+    cuSent: Date.now(),
+    benchmarks: message.benchmarks
   });
 
   broadcast_message(processId, messageToPublish);
