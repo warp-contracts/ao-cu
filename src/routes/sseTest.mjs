@@ -5,10 +5,13 @@ import {getLogger} from "../logger.mjs";
 const sseStreams = new Map();
 const logger = getLogger("sseTestRoute", "trace");
 
+let counter = 0;
+
 export function broadcast_message() {
+  counter++;
   for (let stream of sseStreams.values()) {
     logger.debug(`Sending message`);
-    stream.send('x'.repeat(32000));
+    stream.send(counter + '|x'.repeat(42000));
   }
 }
 
