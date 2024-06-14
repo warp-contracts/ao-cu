@@ -3,7 +3,8 @@ import EventSource from 'eventsource';
 const record_event = (event) => {
   try {
     const message = event.data;
-    console.log('\n ==== new message ==== ', message.length);
+    const counter = message.split('|')[0];
+    console.log(`\n ==== new message ==== ${counter}`, message.length);
   } catch (e) {
     console.log(event);
   }

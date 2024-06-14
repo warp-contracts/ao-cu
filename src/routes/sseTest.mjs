@@ -11,7 +11,7 @@ export function broadcast_message() {
   counter++;
   for (let stream of sseStreams.values()) {
     logger.debug(`Sending message`);
-    stream.send(counter + '|x'.repeat(42000));
+    stream.send(counter + '|' + 'x'.repeat(42000));
   }
 }
 
