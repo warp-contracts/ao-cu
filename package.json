@@ -12,7 +12,7 @@
     "db": "docker compose -f docker-compose-local.yml up --force-recreate --build -d"
   },
   "dependencies": {
-    "warp-contracts-plugin-quickjs": "1.1.9",
+    "warp-contracts-plugin-quickjs": "1.1.10",
     "hyper-express": "6.16.1",
     "warp-contracts": "1.4.44",
     "async-mutex": "^0.5.0",

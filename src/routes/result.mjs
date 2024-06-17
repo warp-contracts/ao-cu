@@ -195,7 +195,8 @@ async function evalMessages(processId, messages, prevState) {
 async function doEvalState(messageId, processId, message, prevState, store) {
   logger.debug(`Eval for ${processId}:${messageId}:${message.Nonce}`);
   const calculationBenchmark = Benchmark.measure();
-  const result = await handlersCache.get(processId).api.handle(message, prevState);
+  const cachedProcess = handlersCache.get(processId);
+  const result = cachedProcess.api.handle(message, cachedProcess.env, prevState);
   logger.info(`Calculating ${calculationBenchmark.elapsed()}`);
   if (!message.benchmarks) {
     message.benchmarks = {};
@@ -236,7 +237,19 @@ async function cacheProcessHandler(processId) {
   })
   handlersCache.set(processId, {
     api: quickJsHandlerApi,
-    def: processDefinition
+    def: processDefinition,
+    env: {
+      Process: {
+        Id: processId,
+        Owner: processDefinition.owner.address,
+        Tags: processDefinition.tags
+      },
+      Module: {
+        Id: processDefinition.moduleTxId,
+        Owner: null, // TODO: load from gql..
+        Tags: null // TODO: load from gql...
+      }
+    }
   });
 }
 
@@ -295,6 +308,7 @@ async function parseProcessData(message) {
     owner: message.owner,
     timestamp: message.timestamp,
     initialState: JSON.parse(message.data),
+    tags: message.tags,
     moduleTxId: tagValue(message.tags, 'Module'),
     moduleSource: await fetchModuleSource(moduleTxId)
   }

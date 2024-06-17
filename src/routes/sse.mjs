@@ -54,8 +54,12 @@ export function subscribeRoute(request, response) {
   if (response.sse) {
     // Looks like we're all good, let's open the stream
     response.sse.open();
-    // OR you may also send a message which will open the stream automatically
-    response.sse.send(`Warm up message ${'x'.repeat(100_000)}`);
+    // note: for some reason - when deploying on GCP - if the first message sent from the server
+    // exceeds ~46000bytes - it is being sent multiple times (as if it was split to 'chunks' - but each 'chunk'
+    // contains full message)
+    // - all the next messages (even if they exceed this size)
+    // are sent "normally" - that's why we're initially sending a big message to "warm-up" the communication :)
+    response.sse.send(`Warm up message ${'x'.repeat(60_000)}`);
 
     // Assign a unique identifier to this stream and store it in our broadcast pool
     response.sse.id = crypto.randomUUID();
