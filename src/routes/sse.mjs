@@ -12,17 +12,17 @@ export function broadcast_message(processId, message) {
   }
   const processStreams = sseStreams.get(processId);
   for (let stream of processStreams.values()) {
-    logger.debug(`Sending message for process ${processId}`);
+    // logger.debug(`Sending message for process ${processId}`);
     stream.send(message);
   }
 }
 
 
-setInterval(() => {
+/*setInterval(() => {
   for (const [key, value] of sseStreams) {
     logger.debug(`Process ${key} subscribers: ${value.size}`);
   }
-}, 10000);
+}, 10000);*/
 
 
 export function getSubscriptions() {

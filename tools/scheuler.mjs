@@ -1,22 +1,14 @@
 import {
   TurboFactory,
-  USD,
-  WinstonToTokenAmount,
   developmentTurboConfiguration,
 } from "@ardrive/turbo-sdk/node";
-import Arweave from "arweave";
 import fs from "fs";
-import {ArweaveSigner} from "@ardrive/turbo-sdk";
 
 (async () => {
   /**
    * Generate a key from the arweave wallet.
    */
   const jwk = JSON.parse(fs.readFileSync('.secrets/wallet.json', "utf-8"));
-  console.log(jwk)
-  /*const signer = new ArweaveSigner(jwk);
-  const turboAuthClient = TurboFactory.authenticated({ signer });
-*/
   /**
    * Use the arweave key to create an authenticated turbo client
    */
