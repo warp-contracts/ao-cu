@@ -24,7 +24,7 @@ export async function resultRoute(request, response) {
   const messageId = request.path_parameters["message-identifier"];
   const processId = request.query_parameters["process-id"];
 
-  messages[messageId] = Date.now();
+  messages[messageId] = performance.now();
 
   const mutexBenchmark = Benchmark.measure();
   if (!mutexes.has(processId)) {
@@ -205,8 +205,7 @@ async function doEvalState(messageId, processId, message, prevState, store) {
 
   if (store) {
     calculationBenchmark.reset();
-    // this one needs to by synced, in order to retain order from the clients' perspective
-    await publish(message, result, processId, messageId);
+    publish(message, result, processId, messageId);
     logger.debug(`Published in ${calculationBenchmark.elapsed()}`);
 
     calculationBenchmark.reset();
@@ -253,7 +252,7 @@ async function cacheProcessHandler(processId) {
   });
 }
 
-async function publish(message, result, processId, messageId) {
+function publish(message, result, processId, messageId) {
 
   const messageToPublish = JSON.stringify({
     txId: messageId,
@@ -262,20 +261,11 @@ async function publish(message, result, processId, messageId) {
     // state: result.State,
     tags: message.Tags,
     cuReceived: messages[messageId],
-    cuSent: Date.now(),
+    cuSent: performance.now(),
     benchmarks: message.benchmarks
   });
 
   broadcast_message(processId, messageToPublish);
-  /*return appSyncPublish(
-    `results/ao/${message.Target}`,
-    messageToPublish,
-    process.env.APPSYNC_KEY
-  ).then(() => {
-    logger.debug(`Result for ${processId}:${messageId}:${message.Nonce} published`);
-  }).catch((e) => {
-    logger.error(e);
-  });*/
 }
 
 async function storeResultInDb(processId, messageId, message, result) {
