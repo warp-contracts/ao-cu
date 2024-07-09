@@ -5,7 +5,7 @@ import {subscribeRoute} from "./routes/sse.mjs";
 import {subscribeTestRoute} from "./routes/sseTest.mjs";
 
 export const api_v1_router = new HyperExpress.Router();
-api_v1_router.get('/result/:message-identifier', resultRoute);
+api_v1_router.post('/result/:message-identifier', resultRoute);
 api_v1_router.get('/subscribe/:process-identifier', subscribeRoute);
 api_v1_router.get('/subscribe-test/', subscribeTestRoute);
 api_v1_router.get('/', mainRoute);

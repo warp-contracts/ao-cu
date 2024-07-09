@@ -21,6 +21,8 @@ const messages = {};
 export async function resultRoute(request, response) {
   const benchmark = Benchmark.measure();
 
+  const msgWithAssignment = await request.json();
+
   const messageId = request.path_parameters["message-identifier"];
   const processId = request.query_parameters["process-id"];
 
@@ -35,7 +37,7 @@ export async function resultRoute(request, response) {
   const release = await mutex.acquire();
   logger.debug(`Acquired mutex in ${mutexBenchmark.elapsed()}`);
   try {
-    const result = await doReadResult(processId, messageId);
+    const result = await doReadResult(processId, messageId, msgWithAssignment);
     logger.info(`Result for ${messageId} calculated in ${benchmark.elapsed()}`);
     return response.json(result);
   } catch (e) {
@@ -47,9 +49,9 @@ export async function resultRoute(request, response) {
   }
 }
 
-async function doReadResult(processId, messageId) {
+async function doReadResult(processId, messageId, msgWithAssignment) {
   const messageBenchmark = Benchmark.measure();
-  const message = await fetchMessageData(messageId, processId);
+  const message = parseMessagesData(msgWithAssignment, processId);
   message.CuReceived = messages[messageId];
   logger.info(`Fetching message info ${messageBenchmark.elapsed()}`);
   message.benchmarks = {
