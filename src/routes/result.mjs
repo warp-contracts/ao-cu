@@ -1,13 +1,10 @@
 import {getLogger} from "../logger.mjs";
 import {QuickJsPlugin} from 'warp-contracts-plugin-quickjs';
 import {tagValue} from "../tools.mjs";
-import {initPubSub as initAppSyncPublish} from 'warp-contracts-pubsub'
 import {getForMsgId, getLessOrEq, insertResult} from "../db.mjs";
 import {Benchmark} from "warp-contracts";
 import {Mutex} from "async-mutex";
 import {broadcast_message} from "./sse.mjs";
-
-initAppSyncPublish()
 
 const logger = getLogger("resultRoute", "trace");
 const suUrl = "http://127.0.0.1:9000";
