@@ -71,8 +71,8 @@ export async function getForMsgId({ processId, messageId }) {
   )
   return result && result.rows && result.rows.length > 0 ? {
     messageId: result.rows[0].message_id,
-    nonce: parsetInt(result.rows[0].nonce),
-    timestamp: parsetInt(result.rows[0].message_timestamp),
+    nonce: parseInt(result.rows[0].nonce),
+    timestamp: parseInt(result.rows[0].message_timestamp),
     result: result.rows[0].result
   } : null;
 }

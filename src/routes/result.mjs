@@ -146,7 +146,7 @@ async function doReadResult(processId, messageId, msgWithAssignment) {
       return result;
     }
   } else {
-    logger.debug('ChachedResult null');
+    logger.debug('Cached Result null');
     const messages = await loadMessages(processId, 0, message.Timestamp);
     const initialState = handlersCache.get(processId).def.initialState;
     const {result, lastMessage} = await evalMessages(processId, messages, initialState);
