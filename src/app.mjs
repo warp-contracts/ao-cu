@@ -3,8 +3,8 @@ import * as HyperExpress from "hyper-express";
 import {api_v1_router} from "./router.mjs";
 import {closePool, createTables} from "./db.mjs";
 import {getLogger} from "./logger.mjs";
-import {THE_BEAVER} from "./beaver.mjs";
 import exitHook from 'async-exit-hook';
+
 dotenv.config();
 
 const logger = getLogger("server", "trace");
@@ -20,7 +20,8 @@ async function runServer() {
   webserver.use('/', api_v1_router);
   const port = parseInt(process.env.PORT) || 8090;
   await webserver.listen(port);
-  logger.info(THE_BEAVER);
+  // logger.info(THE_BEAVER);
+  // logger.info(THE_BEAVER);
   logger.info(`Listening on ${port} port`);
 }
 

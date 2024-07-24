@@ -1,10 +1,10 @@
 import dotenv from "dotenv";
-dotenv.config();
 import pkg from 'pg';
-const { Pool } = pkg;
-
 import {readFileSync} from "fs";
 import {getLogger} from "./logger.mjs";
+
+dotenv.config();
+const { Pool } = pkg;
 
 const dbConfig = {
   max: 20,
@@ -88,15 +88,13 @@ export async function getLessOrEq({ processId, nonce }) {
   )
   //logger.trace(queryResult.rows[0]);
   //logger.trace(queryResult.rows[0].mTimestamp);
-  const result = queryResult && queryResult.rows && queryResult.rows.length > 0 ? {
+  // logger.trace(result);
+
+  return queryResult && queryResult.rows && queryResult.rows.length > 0 ? {
     timestamp: parseInt(queryResult.rows[0].mTimestamp),
     messageId: queryResult.rows[0].message_id,
     nonce: parseInt(queryResult.rows[0].nonce),
     result: queryResult.rows[0].result
   } : null;
-
-  // logger.trace(result);
-
-  return result;
 }
 

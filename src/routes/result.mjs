@@ -5,6 +5,8 @@ import {getForMsgId, getLessOrEq, insertResult} from "../db.mjs";
 import {Benchmark} from "warp-contracts";
 import {Mutex} from "async-mutex";
 import {broadcast_message} from "./sse.mjs";
+import {backOff} from "exponential-backoff";
+
 
 const logger = getLogger("resultRoute", "trace");
 const suUrl = "http://127.0.0.1:9000";
@@ -12,8 +14,18 @@ const suUrl = "http://127.0.0.1:9000";
 const handlersCache = new Map();
 const prevResultCache = new Map();
 const mutexes = new Map();
+const maxNonce = new Map();
 
 const messages = {};
+
+const backOffOptions = {
+  delayFirstAttempt: false,
+  jitter: "none",
+  maxDelay: 1000,
+  numOfAttempts: 5,
+  timeMultiple: 2,
+  startingDelay: 100
+};
 
 export async function resultRoute(request, response) {
   const benchmark = Benchmark.measure();
@@ -25,6 +37,8 @@ export async function resultRoute(request, response) {
 
   messages[messageId] = performance.now();
 
+  const message = parseMessagesData(msgWithAssignment, processId);
+
   const mutexBenchmark = Benchmark.measure();
   if (!mutexes.has(processId)) {
     logger.debug(`Storing mutex for ${processId}`);
@@ -32,25 +46,27 @@ export async function resultRoute(request, response) {
   }
   const mutex = mutexes.get(processId);
   const release = await mutex.acquire();
-  logger.debug(`Acquired mutex in ${mutexBenchmark.elapsed()}`);
+
   try {
-    const result = await doReadResult(processId, messageId, msgWithAssignment);
+    logger.debug(`Acquired mutex in ${mutexBenchmark.elapsed()}`);
+    const currentMaxNonce = maxNonce.get(processId);
+    if (currentMaxNonce >= message.Nonce) {
+      throw new Error(`Already evaluating state with higher nonce (${currentMaxNonce}, ${message.Nonce})`);
+    }
+    maxNonce.set(processId, message.Nonce);
+    const result = await doReadResult(processId, messageId, message);
     logger.info(`Result for ${messageId} calculated in ${benchmark.elapsed()}`);
     return response.json(result);
-  } catch (e) {
-    logger.error(e);
   } finally {
-    logger.debug(`Releasing mutex for ${processId}`);
-    delete messages[messageId];
     release();
+    // logger.debug(`Releasing mutex for ${processId}`);
+    delete messages[messageId];
   }
 }
 
-async function doReadResult(processId, messageId, msgWithAssignment) {
+async function doReadResult(processId, messageId, message) {
   const messageBenchmark = Benchmark.measure();
-  const message = parseMessagesData(msgWithAssignment, processId);
   message.CuReceived = messages[messageId];
-  logger.info(`Fetching message info ${messageBenchmark.elapsed()}`);
   message.benchmarks = {
     fetchMessage: messageBenchmark.elapsed()
   }
@@ -68,19 +84,15 @@ async function doReadResult(processId, messageId, msgWithAssignment) {
     };
   }
   const nonce = message.Nonce;
-  logger.info({messageId, processId, nonce});
   if (!handlersCache.has(processId)) {
     await cacheProcessHandler(processId);
   }
-  logger.info('Process handler cached');
 
   const cacheLookupBenchmark = Benchmark.measure();
-  logger.debug('Checking cached result in L1 cache');
   // first try to load from the in-memory cache...
   let cachedResult = prevResultCache.get(processId);
   // ...fallback to L2 (DB) cache
   if (!cachedResult) {
-    logger.debug('Checking cached result in L2 cache');
     cachedResult = await getLessOrEq({processId, nonce});
   }
   message.benchmarks.cacheLookup = cacheLookupBenchmark.elapsed();
@@ -110,7 +122,7 @@ async function doReadResult(processId, messageId, msgWithAssignment) {
     // (2) most probable case - we need to evaluate the result for the new message,
     // and we have a result cached for the exact previous message
     if (cachedResult.nonce === nonce - 1) {
-      logger.trace(`cachedResult.nonce === message.Nonce - 1`);
+      // logger.trace(`cachedResult.nonce === message.Nonce - 1`);
       const result = await doEvalState(messageId, processId, message, cachedResult.result.State, true);
       prevResultCache.set(processId, {
         messageId,
@@ -124,9 +136,21 @@ async function doReadResult(processId, messageId, msgWithAssignment) {
     // (3) for some reason evaluation for some messages was skipped, and
     // we need to first load all the missing messages(cachedResult.nonce, message.Nonce> from the SU.
     if (cachedResult.nonce < nonce - 1) {
-      logger.trace(`cachedResult.nonce < message.Nonce - 1`);
-      const messages = await loadMessages(processId, cachedResult.timestamp, message.Timestamp);
-      const {result, lastMessage} = await evalMessages(processId, messages, cachedResult.result.State);
+      logger.trace(`cachedResult.nonce (${cachedResult.nonce}) < message.Nonce - 1 (${message.Nonce - 1})`);
+      const expectedMessagesLength = nonce - cachedResult.nonce;
+      const loadedMessages = await loadMessages(processId, cachedResult.timestamp, message.Timestamp);
+      if (loadedMessages?.length !== expectedMessagesLength) {
+        throw new Error(`Not enough messages loaded ${loadedMessages?.length} / ${expectedMessagesLength}`);
+      }
+      /*const messages = await backOff(async () => {
+        const loaded = await loadMessages(processId, cachedResult.timestamp, message.Timestamp);
+        if (loaded?.length !== expectedMessagesLength) {
+          throw new Error(`Not enough messages loaded ${loaded?.length} / ${expectedMessagesLength}`);
+        }
+        return loaded;
+      }, backOffOptions);*/
+
+      const {result, lastMessage} = await evalMessages(processId, loadedMessages, cachedResult.result.State);
       prevResultCache.set(processId, {
         messageId: lastMessage.Id,
         nonce: lastMessage.Nonce,
@@ -146,7 +170,6 @@ async function doReadResult(processId, messageId, msgWithAssignment) {
       return result;
     }
   } else {
-    logger.debug('Cached Result null');
     const messages = await loadMessages(processId, 0, message.Timestamp);
     const initialState = handlersCache.get(processId).def.initialState;
     const {result, lastMessage} = await evalMessages(processId, messages, initialState);
@@ -192,11 +215,10 @@ async function evalMessages(processId, messages, prevState) {
 }
 
 async function doEvalState(messageId, processId, message, prevState, store) {
-  logger.debug(`Eval for ${processId}:${messageId}:${message.Nonce}`);
   const calculationBenchmark = Benchmark.measure();
   const cachedProcess = handlersCache.get(processId);
   const result = await cachedProcess.api.handle(message, cachedProcess.env, prevState);
-  logger.info(`Calculating ${calculationBenchmark.elapsed()}`);
+  logger.info(`Calculating [${processId}:${messageId}:${message.Nonce}]: ${calculationBenchmark.elapsed()}`);
   if (!message.benchmarks) {
     message.benchmarks = {};
   }
@@ -205,12 +227,12 @@ async function doEvalState(messageId, processId, message, prevState, store) {
   if (store) {
     calculationBenchmark.reset();
     publish(message, result, processId, messageId);
-    logger.debug(`Published in ${calculationBenchmark.elapsed()}`);
+    // logger.debug(`Published in ${calculationBenchmark.elapsed()}`);
 
     calculationBenchmark.reset();
     storeResultInDb(processId, messageId, message, result)
       .finally(() => {
-        logger.debug(`Stored in ${calculationBenchmark.elapsed()}`);
+        // logger.debug(`Stored in ${calculationBenchmark.elapsed()}`);
       });
 
   }
@@ -305,38 +327,9 @@ async function parseProcessData(message) {
 
 async function fetchModuleSource(moduleTxId) {
   const response = await fetch(`https://arweave.net/${moduleTxId}`);
+  console.log(`Fetching module ${moduleTxId}`);
   if (response.ok) {
     return await response.text();
-  } else {
-    throw new Error(`${response.statusCode}: ${response.statusMessage}`);
-  }
-}
-
-async function fetchMessageData(messageId, processId) {
-  /*
-  // turns out it is also slow AF....
-  if (timestamp) {
-    // some low-level optimization to use the messages endpoint (which currently responds
-    // faster than the single message endpoint)
-    logger.debug(`Trying to fetch from 'messages' endpoint.`);
-    const url = `${suUrl}/${processId}?from=${timestamp}&to=${timestamp + 60000}`;
-    logger.trace(url);
-    const response = await fetch(url);
-    if (response.ok) {
-      const result = await response.json();
-      if (result.edges?.length && result.edges[0].node.message.id === messageId) {
-        logger.debug("Returning message data from the 'messages' endpoint");
-        return parseMessagesData(result.edges[0].node, processId);
-      }
-    } else {
-      throw new Error(`${response.statusCode}: ${response.statusMessage}`);
-    }
-  }*/
-  logger.debug(`Loading message ${messageId} for process ${processId}`);
-  const response = await fetch(`${suUrl}/${messageId}?process-id=${processId}`);
-  if (response.ok) {
-    const input = await response.json();
-    return parseMessagesData(input, processId);
   } else {
     throw new Error(`${response.statusCode}: ${response.statusMessage}`);
   }
@@ -346,7 +339,6 @@ function parseMessagesData(input, processId) {
   const {message, assignment} = input;
 
   const type = tagValue(message.tags, 'Type');
-  logger.debug(`Message ${message.id} type: ${type}`);
   if (type === 'Process') {
     logger.debug("Process deploy message");
     logger.debug("=== message ===");

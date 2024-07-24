@@ -12,19 +12,21 @@
     "db": "docker compose -f docker-compose-local.yml up --force-recreate --build -d"
   },
   "dependencies": {
-    "warp-contracts-plugin-quickjs": "1.1.12",
-    "hyper-express": "6.16.1",
-    "warp-contracts": "1.4.44",
+    "async-exit-hook": "^2.0.1",
     "async-mutex": "^0.5.0",
-    "pino": "^9.1.0",
-    "pg": "^8.11.5",
     "dotenv": "^16.4.5",
-    "async-exit-hook": "^2.0.1"
+    "exponential-backoff": "^3.1.1",
+    "hyper-express": "6.16.1",
+    "pg": "^8.11.5",
+    "pino": "^9.1.0",
+    "pm2-cluster-cache": "^2.1.7",
+    "warp-contracts": "1.4.44",
+    "warp-contracts-plugin-quickjs": "1.1.12"
   },
   "devDependencies": {
-    "pino-pretty": "^11.0.0",
     "@ardrive/turbo-sdk": "latest",
+    "arweave": "^1.14.4",
     "eventsource": "^2.0.2",
-    "arweave": "^1.14.4"
+    "pino-pretty": "^11.0.0"
   }
 }
