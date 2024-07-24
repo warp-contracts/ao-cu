@@ -283,7 +283,8 @@ function publish(message, result, processId, messageId) {
     tags: message.Tags,
     cuReceived: messages[messageId],
     cuSent: performance.now(),
-    benchmarks: message.benchmarks
+    benchmarks: message.benchmarks,
+    walletAddress: message.Owner,
   });
 
   broadcast_message(processId, messageToPublish);
