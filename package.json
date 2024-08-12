@@ -21,7 +21,7 @@
     "pino": "^9.1.0",
     "pm2-cluster-cache": "^2.1.7",
     "warp-contracts": "1.4.44",
-    "warp-contracts-plugin-quickjs": "1.1.12"
+    "warp-contracts-plugin-quickjs": "1.1.13"
   },
   "devDependencies": {
     "@ardrive/turbo-sdk": "latest",

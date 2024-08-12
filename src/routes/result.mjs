@@ -309,10 +309,10 @@ async function fetchProcessDef(processId) {
 }
 
 async function parseProcessData(message) {
-  // TODO: check whether module and process were deployed from our "jnio" wallet
-  if (message.owner.address !== "jnioZFibZSCcV8o-HkBXYPYEYNib4tqfexP0kCBXX_M") {
-    logger.error(`Only processes from "jnioZFibZSCcV8o-HkBXYPYEYNib4tqfexP0kCBXX_M" address are allowed, used: ${message.owner.address}`);
-    throw new Error(`Only processes from "jnioZFibZSCcV8o-HkBXYPYEYNib4tqfexP0kCBXX_M" address are allowed`);
+  if (message.owner.address !== "f70fYdp_r-oJ_EApckTYQ6d66KaEScQLGTllu98QgXg"
+    && message.owner.address !== "jnioZFibZSCcV8o-HkBXYPYEYNib4tqfexP0kCBXX_M") {
+    logger.error(`Process from not trusted wallet ${message.owner.address}`);
+    throw new Error(`Processes from "${message.owner.address}" address are not allowed`);
   }
   const moduleTxId = tagValue(message.tags, 'Module');
   return {
