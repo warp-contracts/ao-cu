@@ -310,7 +310,7 @@ async function fetchProcessDef(processId) {
 
 async function parseProcessData(message) {
   if (message.owner.address !== "f70fYdp_r-oJ_EApckTYQ6d66KaEScQLGTllu98QgXg"
-    && message.owner.address !== "jnioZFibZSCcV8o-HkBXYPYEYNib4tqfexP0kCBXX_M") {
+    && message.owner.address !== "jmGGoJaDYDTx4OCM7MP-7l-VLIM4ZEGCS0cHPsSmiNE") {
     logger.error(`Process from not trusted wallet ${message.owner.address}`);
     throw new Error(`Processes from "${message.owner.address}" address are not allowed`);
   }
