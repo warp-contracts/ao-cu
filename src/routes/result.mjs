@@ -1,15 +1,14 @@
-import {getLogger} from "../logger.mjs";
-import {QuickJsPlugin} from 'warp-contracts-plugin-quickjs';
-import {tagValue} from "../tools.mjs";
-import {getForMsgId, getLessOrEq, insertResult} from "../db.mjs";
-import {Benchmark} from "warp-contracts";
-import {Mutex} from "async-mutex";
-import {broadcast_message} from "./sse.mjs";
-import {backOff} from "exponential-backoff";
+import { getLogger } from '../logger.mjs';
+import { QuickJsPlugin } from 'warp-contracts-plugin-quickjs';
+import { tagValue } from '../tools.mjs';
+import { getForMsgId, getLessOrEq, insertResult } from '../db.mjs';
+import { Benchmark } from 'warp-contracts';
+import { Mutex } from 'async-mutex';
+import { broadcast_message } from './sse.mjs';
+import { sendRsgTokens } from '../warpy/sendRsgTokens.mjs';
 
-
-const logger = getLogger("resultRoute", "trace");
-const suUrl = "http://127.0.0.1:9000";
+const logger = getLogger('resultRoute', 'trace');
+const suUrl = 'http://127.0.0.1:9000';
 
 const handlersCache = new Map();
 const prevResultCache = new Map();
@@ -20,11 +19,11 @@ const messages = {};
 
 const backOffOptions = {
   delayFirstAttempt: false,
-  jitter: "none",
+  jitter: 'none',
   maxDelay: 1000,
   numOfAttempts: 5,
   timeMultiple: 2,
-  startingDelay: 100
+  startingDelay: 100,
 };
 
 export async function resultRoute(request, response) {
@@ -32,8 +31,8 @@ export async function resultRoute(request, response) {
 
   const msgWithAssignment = await request.json();
 
-  const messageId = request.path_parameters["message-identifier"];
-  const processId = request.query_parameters["process-id"];
+  const messageId = request.path_parameters['message-identifier'];
+  const processId = request.query_parameters['process-id'];
 
   messages[messageId] = performance.now();
 
@@ -68,8 +67,8 @@ async function doReadResult(processId, messageId, message) {
   const messageBenchmark = Benchmark.measure();
   message.CuReceived = messages[messageId];
   message.benchmarks = {
-    fetchMessage: messageBenchmark.elapsed()
-  }
+    fetchMessage: messageBenchmark.elapsed(),
+  };
   // note: this effectively skips the initial process message -
   // which in AO is considered as a 'constructor' - we do not need it now
   if (message === null) {
@@ -80,7 +79,7 @@ async function doReadResult(processId, messageId, message) {
       Spawns: [],
       Assignments: [],
       Output: null,
-      State: {}
+      State: {},
     };
   }
   const nonce = message.Nonce;
@@ -93,7 +92,7 @@ async function doReadResult(processId, messageId, message) {
   let cachedResult = prevResultCache.get(processId);
   // ...fallback to L2 (DB) cache
   if (!cachedResult) {
-    cachedResult = await getLessOrEq({processId, nonce});
+    cachedResult = await getLessOrEq({ processId, nonce });
   }
   message.benchmarks.cacheLookup = cacheLookupBenchmark.elapsed();
 
@@ -105,7 +104,7 @@ async function doReadResult(processId, messageId, message) {
       messageId,
       nonce,
       timestamp: message.Timestamp,
-      result
+      result,
     });
     return result;
   }
@@ -116,7 +115,7 @@ async function doReadResult(processId, messageId, message) {
       logger.trace(`cachedResult.nonce === message.Nonce`);
       logger.debug(`Exact match for nonce ${message.Nonce}`);
       await publish(message, cachedResult.result, processId, messageId);
-      return cachedResult.result
+      return cachedResult.result;
     }
 
     // (2) most probable case - we need to evaluate the result for the new message,
@@ -128,7 +127,7 @@ async function doReadResult(processId, messageId, message) {
         messageId,
         nonce,
         timestamp: message.Timestamp,
-        result
+        result,
       });
       return result;
     }
@@ -150,12 +149,12 @@ async function doReadResult(processId, messageId, message) {
         return loaded;
       }, backOffOptions);*/
 
-      const {result, lastMessage} = await evalMessages(processId, loadedMessages, cachedResult.result.State);
+      const { result, lastMessage } = await evalMessages(processId, loadedMessages, cachedResult.result.State);
       prevResultCache.set(processId, {
         messageId: lastMessage.Id,
         nonce: lastMessage.Nonce,
         timestamp: lastMessage.Timestamp,
-        result
+        result,
       });
       return result;
     }
@@ -163,7 +162,7 @@ async function doReadResult(processId, messageId, message) {
     if (cachedResult.nonce > nonce) {
       logger.trace(`cachedResult.nonce > message.Nonce`);
       logger.warn(`${messageId} for ${processId} already evaluated, returning from L2 cache`);
-      const result = await getForMsgId({processId, messageId});
+      const result = await getForMsgId({ processId, messageId });
       if (!result) {
         throw new Error(`Result for $${processId}:${messageId}:${nonce} not found in L2 cache`);
       }
@@ -172,12 +171,12 @@ async function doReadResult(processId, messageId, message) {
   } else {
     const messages = await loadMessages(processId, 0, message.Timestamp);
     const initialState = handlersCache.get(processId).def.initialState;
-    const {result, lastMessage} = await evalMessages(processId, messages, initialState);
+    const { result, lastMessage } = await evalMessages(processId, messages, initialState);
     prevResultCache.set(processId, {
       messageId: lastMessage.Id,
       nonce: lastMessage.Nonce,
       timestamp: lastMessage.Timestamp,
-      result
+      result,
     });
     return result;
   }
@@ -192,7 +191,7 @@ async function evalMessages(processId, messages, prevState) {
       Spawns: [],
       Assignments: [],
       Output: null,
-      State: prevState
+      State: prevState,
     };
   }
   let result;
@@ -205,12 +204,11 @@ async function evalMessages(processId, messages, prevState) {
 
   await publish(lastMessage, result, processId, lastMessage.Id);
   // do not await in order not to slow down the processing
-  storeResultInDb(processId, lastMessage.Id, lastMessage, result)
-    .finally();
+  storeResultInDb(processId, lastMessage.Id, lastMessage, result).finally();
 
   return {
     lastMessage,
-    result
+    result,
   };
 }
 
@@ -219,6 +217,10 @@ async function doEvalState(messageId, processId, message, prevState, store) {
   const cachedProcess = handlersCache.get(processId);
   const result = await cachedProcess.api.handle(message, cachedProcess.env, prevState);
   logger.info(`Calculating [${processId}:${messageId}:${message.Nonce}]: ${calculationBenchmark.elapsed()}`);
+  if (result?.Output?.cmd == 'tokensSent' && result.Output.external?.rsg) {
+    sendRsgTokens(result.Output.external.rsg).then();
+  }
+
   if (!message.benchmarks) {
     message.benchmarks = {};
   }
@@ -230,11 +232,9 @@ async function doEvalState(messageId, processId, message, prevState, store) {
     // logger.debug(`Published in ${calculationBenchmark.elapsed()}`);
 
     calculationBenchmark.reset();
-    storeResultInDb(processId, messageId, message, result)
-      .finally(() => {
-        // logger.debug(`Stored in ${calculationBenchmark.elapsed()}`);
-      });
-
+    storeResultInDb(processId, messageId, message, result).finally(() => {
+      // logger.debug(`Stored in ${calculationBenchmark.elapsed()}`);
+    });
   }
 
   return {
@@ -243,7 +243,7 @@ async function doEvalState(messageId, processId, message, prevState, store) {
     Spawns: result.Spawns,
     Output: result.Output,
     State: result.State,
-    Assignments: []
+    Assignments: [],
   };
 }
 
@@ -253,8 +253,8 @@ async function cacheProcessHandler(processId) {
   const quickJsPlugin = new QuickJsPlugin({});
   const quickJsHandlerApi = await quickJsPlugin.process({
     contractSource: processDefinition.moduleSource,
-    binaryType: 'release_sync'
-  })
+    binaryType: 'release_sync',
+  });
   handlersCache.set(processId, {
     api: quickJsHandlerApi,
     def: processDefinition,
@@ -262,19 +262,18 @@ async function cacheProcessHandler(processId) {
       Process: {
         Id: processId,
         Owner: processDefinition.owner.address,
-        Tags: processDefinition.tags
+        Tags: processDefinition.tags,
       },
       Module: {
         Id: processDefinition.moduleTxId,
         Owner: null, // TODO: load from gql..
-        Tags: null // TODO: load from gql...
-      }
-    }
+        Tags: null, // TODO: load from gql...
+      },
+    },
   });
 }
 
 function publish(message, result, processId, messageId) {
-
   const messageToPublish = JSON.stringify({
     txId: messageId,
     nonce: message.Nonce,
@@ -292,7 +291,7 @@ function publish(message, result, processId, messageId) {
 
 async function storeResultInDb(processId, messageId, message, result) {
   try {
-    await insertResult({processId, messageId, result, nonce: message.Nonce, timestamp: message.Timestamp});
+    await insertResult({ processId, messageId, result, nonce: message.Nonce, timestamp: message.Timestamp });
     logger.debug(`Result for ${processId}:${messageId}:${message.Nonce} stored in db`);
   } catch (e) {
     logger.error(e);
@@ -309,8 +308,10 @@ async function fetchProcessDef(processId) {
 }
 
 async function parseProcessData(message) {
-  if (message.owner.address !== "f70fYdp_r-oJ_EApckTYQ6d66KaEScQLGTllu98QgXg"
-    && message.owner.address !== "jmGGoJaDYDTx4OCM7MP-7l-VLIM4ZEGCS0cHPsSmiNE") {
+  if (
+    message.owner.address !== 'f70fYdp_r-oJ_EApckTYQ6d66KaEScQLGTllu98QgXg' &&
+    message.owner.address !== 'jmGGoJaDYDTx4OCM7MP-7l-VLIM4ZEGCS0cHPsSmiNE'
+  ) {
     logger.error(`Process from not trusted wallet ${message.owner.address}`);
     throw new Error(`Processes from "${message.owner.address}" address are not allowed`);
   }
@@ -322,8 +323,8 @@ async function parseProcessData(message) {
     initialState: JSON.parse(message.data),
     tags: message.tags,
     moduleTxId: tagValue(message.tags, 'Module'),
-    moduleSource: await fetchModuleSource(moduleTxId)
-  }
+    moduleSource: await fetchModuleSource(moduleTxId),
+  };
 }
 
 async function fetchModuleSource(moduleTxId) {
@@ -337,35 +338,35 @@ async function fetchModuleSource(moduleTxId) {
 }
 
 function parseMessagesData(input, processId) {
-  const {message, assignment} = input;
+  const { message, assignment } = input;
 
   const type = tagValue(message.tags, 'Type');
   if (type === 'Process') {
-    logger.debug("Process deploy message");
-    logger.debug("=== message ===");
+    logger.debug('Process deploy message');
+    logger.debug('=== message ===');
     logger.debug(message);
-    logger.debug("=== assignment ===");
+    logger.debug('=== assignment ===');
     logger.debug(assignment);
     return null;
   }
   return {
-    "Id": message.id,
-    "Signature": message.signature,
-    "Data": message.data,
-    "Owner": message.owner.address,
-    "Target": processId,
-    "Anchor": null,
-    "From": processId,
-    "Forwarded-By": message.owner.address,
-    "Tags": message.tags.concat(assignment.tags),
-    "Epoch": parseInt(tagValue(assignment.tags, 'Epoch')),
-    "Nonce": parseInt(tagValue(assignment.tags, 'Nonce')),
-    "Timestamp": parseInt(tagValue(assignment.tags, 'Timestamp')),
-    "Block-Height": parseInt(tagValue(assignment.tags, 'Block-Height')),
-    "Hash-Chain": parseInt(tagValue(assignment.tags, 'Hash-Chain')),
-    "Cron": false,
-    "Read-Only": false
-  }
+    Id: message.id,
+    Signature: message.signature,
+    Data: message.data,
+    Owner: message.owner.address,
+    Target: processId,
+    Anchor: null,
+    From: processId,
+    'Forwarded-By': message.owner.address,
+    Tags: message.tags.concat(assignment.tags),
+    Epoch: parseInt(tagValue(assignment.tags, 'Epoch')),
+    Nonce: parseInt(tagValue(assignment.tags, 'Nonce')),
+    Timestamp: parseInt(tagValue(assignment.tags, 'Timestamp')),
+    'Block-Height': parseInt(tagValue(assignment.tags, 'Block-Height')),
+    'Hash-Chain': parseInt(tagValue(assignment.tags, 'Hash-Chain')),
+    Cron: false,
+    'Read-Only': false,
+  };
 }
 
 // TODO: lame implementation "for now", stream messages, or at least whole pages.
