@@ -111,8 +111,9 @@ async function writeInteractionToWarpy(rsg, addressToRoles) {
     return {
       id: address,
       roles: roles || [],
-      points: rsg.recipients[`jmGGoJaDYDTx4OCM7MP-7l-VLIM4ZEGCS0cHPsSmiNE`],
-      // rsg.recipients[Object.keys(rsg.recipients).find((r) => r.toLowerCase() == address.toLowerCase())] || 0,
+      points:
+        parseInt(rsg.recipients[Object.keys(rsg.recipients).find((r) => r.toLowerCase() == address.toLowerCase())]) ||
+        0,
     };
   });
 
