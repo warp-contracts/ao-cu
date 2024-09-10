@@ -10,14 +10,13 @@ export async function sendRsgTokens(rsg) {
       console.log(`no recipients found`, rsg);
       return;
     }
-    // const addresses = Object.keys(rsg.recipients);
+    const addresses = Object.keys(rsg.recipients);
 
-    // if (addresses.length == 0) {
-    //   console.log('no recipients found in the external tokens map');
-    //   return;
-    // }
+    if (addresses.length == 0) {
+      console.log('no recipients found in the external tokens map');
+      return;
+    }
 
-    const addresses = ['0x50Ff383E6b308069fD525B0ABa1474d9fe086743'];
     console.log('found new Warpy external tokens recipients', addresses);
 
     try {
