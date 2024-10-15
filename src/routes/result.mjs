@@ -6,6 +6,8 @@ import { Benchmark } from 'warp-contracts';
 import { Mutex } from 'async-mutex';
 import { broadcast_message } from './sse.mjs';
 import { sendRsgTokens } from '../warpy/sendRsgTokens.mjs';
+import base64url from 'base64url';
+import { computeAddress, hexlify } from 'ethers';
 
 const logger = getLogger('resultRoute', 'trace');
 const suUrl = 'http://127.0.0.1:9000';
@@ -340,6 +342,11 @@ async function fetchModuleSource(moduleTxId) {
 function parseMessagesData(input, processId) {
   const { message, assignment } = input;
 
+  let ownerAddress = message?.owner?.address;
+  if (message?.tags?.find((t) => t.name == 'Signature-Type' && t.value == 'ethereum')) {
+    ownerAddress = computeAddress(hexlify(base64url.toBuffer(message?.owner?.key)));
+  }
+
   const type = tagValue(message.tags, 'Type');
   if (type === 'Process') {
     logger.debug('Process deploy message');
@@ -353,7 +360,7 @@ function parseMessagesData(input, processId) {
     Id: message.id,
     Signature: message.signature,
     Data: message.data,
-    Owner: message.owner.address,
+    Owner: ownerAddress,
     Target: processId,
     Anchor: null,
     From: processId,
