@@ -20,8 +20,6 @@ async function runServer() {
   webserver.use('/', api_v1_router);
   const port = parseInt(process.env.PORT) || 8090;
   await webserver.listen(port);
-  // logger.info(THE_BEAVER);
-  // logger.info(THE_BEAVER);
   logger.info(`Listening on ${port} port`);
 }
 
