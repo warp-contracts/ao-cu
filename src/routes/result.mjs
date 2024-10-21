@@ -13,7 +13,7 @@ const logger = getLogger('resultRoute', 'trace');
 const suUrl = 'http://127.0.0.1:9000';
 
 const handlersCache = new Map();
-const prevResultCache = new Map();
+export const prevResultCache = new Map();
 const mutexes = new Map();
 const maxNonce = new Map();
 
