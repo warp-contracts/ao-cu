@@ -25,5 +25,5 @@ const external = {
 
 
 
-sendRsgTokens(external.rsg)
+sendRsgTokens(external.rsg, "asd")
     .then(() => console.log(`Uhh, finished!`));

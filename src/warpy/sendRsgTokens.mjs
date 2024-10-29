@@ -1,5 +1,5 @@
 import { backOff } from 'exponential-backoff';
-import { defaultCacheOptions, WarpFactory } from 'warp-contracts';
+import {defaultCacheOptions, Tag, WarpFactory} from 'warp-contracts';
 
 const dreWarpyUrl = `https://dre-warpy.warp.cc`;
 const apiWarpyUrl = `https://api-warpy.warp.cc`;
@@ -41,7 +41,7 @@ export async function sendRsgTokens(rsg, processId) {
       console.log(`users roles assigned to the Warpy external tokens recipients`, addressToRolesBatches);
 
       const results = (await Promise.all(addressToRolesBatches
-          .map((addressToRoles) => writeInteractionToWarpy(rsg, addressToRoles))))
+          .map((addressToRoles) => writeInteractionToWarpy(rsg, addressToRoles, processId))))
           .map((response) => response?.originalTxId);
 
       console.log(`interactions sent to Warpy, processId ${processId}`, results);
@@ -111,7 +111,7 @@ function mapAddressToRolesBatches(addresses, usersIds, usersRoles) {
   return batch;
 }
 
-async function writeInteractionToWarpy(rsg, addressToRoles) {
+async function writeInteractionToWarpy(rsg, addressToRoles, processId) {
   const warp = WarpFactory.forMainnet({ ...defaultCacheOptions, inMemory: true });
   const contract = warp
     .contract(rsg.id)
@@ -138,5 +138,5 @@ async function writeInteractionToWarpy(rsg, addressToRoles) {
     points: 0,
   };
   console.log(`writing interaction to Warpy..., ${JSON.stringify(addPointsInput)}`);
-  return await contract.writeInteraction(addPointsInput);
+  return await contract.writeInteraction(addPointsInput, { tags: [ new Tag("Game-Process-Id", processId || '') ]});
 }
