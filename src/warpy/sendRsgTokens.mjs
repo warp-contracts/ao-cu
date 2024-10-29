@@ -3,8 +3,9 @@ import { defaultCacheOptions, WarpFactory } from 'warp-contracts';
 
 const dreWarpyUrl = `https://dre-warpy.warp.cc`;
 const apiWarpyUrl = `https://api-warpy.warp.cc`;
+const membersBatch = 4;
 
-export async function sendRsgTokens(rsg) {
+export async function sendRsgTokens(rsg, processId) {
   const request = async () => {
     if (!rsg.recipients) {
       console.log(`no recipients found`, rsg);
@@ -36,13 +37,16 @@ export async function sendRsgTokens(rsg) {
       const usersRoles = await getWarpyUsersRoles(ids);
       console.log(`users roles assigned to the Warpy ids`, usersRoles);
 
-      const addressToRoles = mapAddressToRoles(addresses, usersIds, usersRoles);
-      console.log(`users roles assigned to the Warpy external tokens recipients`, addressToRoles);
+      const addressToRolesBatches = mapAddressToRolesBatches(addresses, usersIds, usersRoles);
+      console.log(`users roles assigned to the Warpy external tokens recipients`, addressToRolesBatches);
 
-      const response = await writeInteractionToWarpy(rsg, addressToRoles);
-      console.log(`interaction sent to Warpy`, response?.originalTxId);
+      const results = (await Promise.all(addressToRolesBatches
+          .map((addressToRoles) => writeInteractionToWarpy(rsg, addressToRoles))))
+          .map((response) => response?.originalTxId);
+
+      console.log(`interactions sent to Warpy, processId ${processId}`, results);
     } catch (e) {
-      console.error('error while sending Warpy external tokens', e);
+      console.error(`error while sending Warpy external tokens, processId ${processId}`, e);
       return Promise.reject(e);
     }
   };
@@ -54,7 +58,7 @@ export async function sendRsgTokens(rsg) {
       numOfAttempts: 5,
     });
   } catch (error) {
-    throw new Error(`unable to send Warpy external tokens. ${error}`);
+    throw new Error(`Unable to send Warpy external tokens, processId ${processId}. ${error}`);
   }
 }
 
@@ -84,18 +88,27 @@ async function getWarpyUsersRoles(ids) {
   )?.['id_to_roles'];
 }
 
-function mapAddressToRoles(addresses, usersIds, usersRoles) {
-  const addressToRoles = {};
+function mapAddressToRolesBatches(addresses, usersIds, usersRoles) {
+  const batch = [];
+  let addressToRoles = {};
+  let i = 0;
   for (let address of addresses) {
     const userId = usersIds[address.toLowerCase()];
     if (userId) {
       addressToRoles[address] = usersRoles[userId];
-    } else {
-      continue;
+      i++;
+      if (i >= membersBatch) {
+        batch.push(addressToRoles);
+        addressToRoles = {};
+        i = 0;
+      }
     }
   }
+  if (Object.keys(addressToRoles).length > 0) {
+    batch.push(addressToRoles);
+  }
 
-  return addressToRoles;
+  return batch;
 }
 
 async function writeInteractionToWarpy(rsg, addressToRoles) {

@@ -220,7 +220,7 @@ async function doEvalState(messageId, processId, message, prevState, store) {
   const result = await cachedProcess.api.handle(message, cachedProcess.env, prevState);
   logger.info(`Calculating [${processId}:${messageId}:${message.Nonce}]: ${calculationBenchmark.elapsed()}`);
   if (result?.Output?.cmd == 'tokensSent' && result.Output.external?.rsg) {
-    sendRsgTokens(result.Output.external.rsg).then();
+    sendRsgTokens(result.Output.external.rsg, processId).then();
   }
 
   if (!message.benchmarks) {
