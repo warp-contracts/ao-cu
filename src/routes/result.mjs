@@ -8,6 +8,7 @@ import { broadcast_message } from './sse.mjs';
 import { sendRsgTokens } from '../warpy/sendRsgTokens.mjs';
 import base64url from 'base64url';
 import { computeAddress, hexlify } from 'ethers';
+import zlib from 'node:zlib';
 
 const logger = getLogger('resultRoute', 'trace');
 const suUrl = 'http://127.0.0.1:9000';
@@ -254,7 +255,7 @@ async function cacheProcessHandler(processId) {
   const processDefinition = await fetchProcessDef(processId);
   const quickJsPlugin = new QuickJsPlugin({
     interruptCycles: 10000,
-    memoryLimit: 10 * 1024 * 1024 // 10 MB
+    memoryLimit: 10 * 1024 * 1024, // 10 MB
   });
   const quickJsHandlerApi = await quickJsPlugin.process({
     contractSource: processDefinition.moduleSource,
@@ -336,7 +337,8 @@ async function fetchModuleSource(moduleTxId) {
   const response = await fetch(`https://arweave.net/${moduleTxId}`);
   console.log(`Fetching module ${moduleTxId}`);
   if (response.ok) {
-    return await response.text();
+    const resBuf = await response.arrayBuffer();
+    return zlib.gunzipSync(resBuf).toString();
   } else {
     throw new Error(`${response.statusCode}: ${response.statusMessage}`);
   }
