@@ -252,7 +252,10 @@ async function doEvalState(messageId, processId, message, prevState, store) {
 async function cacheProcessHandler(processId) {
   logger.info('Process handler not cached', processId);
   const processDefinition = await fetchProcessDef(processId);
-  const quickJsPlugin = new QuickJsPlugin({});
+  const quickJsPlugin = new QuickJsPlugin({
+    interruptCycles: 10000,
+    memoryLimit: 10 * 1024 * 1024 // 10 MB
+  });
   const quickJsHandlerApi = await quickJsPlugin.process({
     contractSource: processDefinition.moduleSource,
     binaryType: 'release_sync',
