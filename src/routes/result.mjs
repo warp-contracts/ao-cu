@@ -341,7 +341,14 @@ async function fetchModuleSource(moduleTxId) {
       const resBuf = await response.arrayBuffer();
       return zlib.gunzipSync(resBuf).toString();
     } catch (e) {
-      return await response.text();
+      console.log(`Fallback fetching module ${moduleTxId}`);
+      // note: cannot reuse response here = "Body is not usable"
+      const responseText = await fetch(`https://arweave.net/${moduleTxId}`);
+      if (responseText.ok) {
+        return await responseText.text();
+      } else {
+        throw new Error(`${responseText.statusCode}: ${responseText.statusMessage}`);
+      }
     }
   } else {
     throw new Error(`${response.statusCode}: ${response.statusMessage}`);
