@@ -337,8 +337,12 @@ async function fetchModuleSource(moduleTxId) {
   const response = await fetch(`https://arweave.net/${moduleTxId}`);
   console.log(`Fetching module ${moduleTxId}`);
   if (response.ok) {
-    const resBuf = await response.arrayBuffer();
-    return zlib.gunzipSync(resBuf).toString();
+    try {
+      const resBuf = await response.arrayBuffer();
+      return zlib.gunzipSync(resBuf).toString();
+    } catch (e) {
+      return await response.text();
+    }
   } else {
     throw new Error(`${response.statusCode}: ${response.statusMessage}`);
   }
