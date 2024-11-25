@@ -134,7 +134,7 @@ async function writeInteractionToWarpy(rsg, addressToRoles, processId) {
     function: 'addPointsForAddress',
     adminId: '769844280767807520',
     members,
-    noBoost: false,
+    noBoost: true,
     points: 0,
   };
   console.log(`writing interaction to Warpy..., ${JSON.stringify(addPointsInput)}`);
